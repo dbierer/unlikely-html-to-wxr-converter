@@ -25,6 +25,13 @@ class BuildWXRTest extends TestCase
         $actual   = (empty($build->export));
         $this->assertEquals($expected, $actual, 'Config key "export" not found');
     }
+    public function testConstructItemConfigKeyFound()
+    {
+        $build   = new BuildWXR($this->extract, $this->config);
+        $expected = FALSE;
+        $actual   = (empty($build->item));
+        $this->assertEquals($expected, $actual, 'Config key "item" not found');
+    }
     public function testConstructXmlWriterFound()
     {
         $build   = new BuildWXR($this->extract, $this->config);
@@ -72,7 +79,7 @@ class BuildWXRTest extends TestCase
         $actual = $build->writer->outputMemory();
         $this->assertEquals($expected, $actual, 'Nested nodes with CDATA not built correctly');
     }
-    public function testBuildTemplate()
+    public function testBuildTemplateReturnsDOMDocument()
     {
         $build = new BuildWXR($this->extract, $this->config);
         $build->buildTemplate();
@@ -96,10 +103,104 @@ class BuildWXRTest extends TestCase
         $actual   = strpos($build->template->saveXML(), '</channel>');
         $this->assertEquals($expected, $actual, 'buildTemplate() does not create "channel" node');
     }
-    public function testAddArticle()
+    public function testAddCallbackStoresObject()
     {
+        $build = new BuildWXR($this->extract, $this->config);
+        $before = count($build->callbackManager);
+        $build->addCallback(new DateTime());
+        $after = count($build->callbackManager);
         $expected = TRUE;
-        $actual   = FALSE;
-        $this->assertEquals($expected, $actual, 'addArticle() not working');
+        $actual = ($after > $before);
+        $this->assertEquals($expected, $actual, 'CallbackManager did not store object');
+    }
+    public function testgetCallbackReturnsObject()
+    {
+        $build = new BuildWXR($this->extract, $this->config);
+        $build->addCallback(new DateTime());
+        $expected = 'DateTime';
+        $obj = $build->getCallback('DateTime');
+        $actual = get_class($obj);
+        $this->assertEquals($expected, $actual, 'CallbackManager did not return object');
+    }
+    public function testBuildWXRStoresExtractInstance()
+    {
+        $build = new BuildWXR($this->extract, $this->config);
+        $expected = Extract::class;
+        $obj = $build->getCallback(Extract::class);
+        $actual = get_class($obj);
+        $this->assertEquals($expected, $actual, 'Extract instance not found in callbackManager');
+    }
+    public function testAddArticleReturnsDOMDocument()
+    {
+        $build = new BuildWXR($this->extract, $this->config);
+        $article = $build->addArticle([]);
+        $expected = 'DOMDocument';
+        $actual   = get_class($article);
+        $this->assertEquals($expected, $actual, 'buildTemplate() does not create SimpleXMLElement instance');
+    }
+    public function testAddArticleAddsSingleTextNode()
+    {
+        $build = new BuildWXR($this->extract, $this->config);
+        $article = $build->addArticle(['test' => 'TEST']);
+        $expected = 'TEST';
+        $test = $article->getElementsByTagName('test')[0] ?? NULL;
+        $actual = $test->textContent ?? '';
+        $this->assertEquals($expected, $actual, 'Single text node not added');
+    }
+    public function testAddArticleAddsSingleTextCDataNode()
+    {
+        $build = new BuildWXR($this->extract, $this->config);
+        $article = $build->addArticle(['test' => ['CDATA' => 'TEST']]);
+        $cdata = '<![CDATA[TEST]]>';
+        $expected = TRUE;
+        $actual = (bool) strpos($article->saveXML(), $cdata);
+        $this->assertEquals($expected, $actual, 'Single CDATA text node not added');
+    }
+    public function testDoCallbackUsingFunction()
+    {
+        $build = new BuildWXR($this->extract, $this->config);
+        $params = ['callable' => 'strtoupper', 'args' => 'test'];
+        $expected = 'TEST';
+        $actual = $build->doCallback($params);
+        $this->assertEquals($expected, $actual, 'Callable argument does not work');
+    }
+    public function testDoCallbackUsingAnonFunctionAndArrayArgs()
+    {
+        $build = new BuildWXR($this->extract, $this->config);
+        $func = function (array $args) {
+            $out = [];
+            foreach ($args as $obj) $out[] = $obj->format('Y-m-d');
+            return $out;
+        };
+        $params = ['callable' => $func, 'args' => [new DateTime('now'), new DateTime('tomorrow')]];
+        $expected = date('Y-m-d');
+        $actual = $build->doCallback($params)[0] ?? '';
+        $this->assertEquals($expected, $actual, 'Anonymous function with array arguments does not work');
+    }
+    public function testDoCallbackUsingCallbackManager()
+    {
+        $this->config['ArrayObject'] = ['A','B','C'];
+        $build = new BuildWXR($this->extract, $this->config);
+        $params = ['class' => 'ArrayObject', 'method' => 'getArrayCopy'];
+        $expected = ['A','B','C'];
+        $actual = $build->doCallback($params);
+        $this->assertEquals($expected, $actual, 'doCallback using callback class does not work');
+    }
+    public function testAddArticleRunsCallback()
+    {
+        $this->config['item'] = [
+            'title' => ['CDATA' =>
+                ['callback' => [
+                    'class' => Extract::class,
+                    'method' => 'getTitle']
+                ]
+            ],
+        ];
+        $build = new BuildWXR($this->extract, $this->config);
+        $article = $build->addArticle([]);
+        $expected = 'Chronic Mercury Poisoning: Symptoms &amp; Diseases';
+        $test = $article->getElementsByTagName('title')[0] ?? NULL;
+        $actual = $test->textContent ?? '';
+        $this->assertEquals($expected, $actual, 'addArticles does not process callback correctly');
     }
 }

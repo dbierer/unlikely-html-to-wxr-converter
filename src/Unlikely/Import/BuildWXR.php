@@ -38,29 +38,54 @@ use DOMDocument;
 
 class BuildWXR
 {
-    public const ERR_CALLBACK = 'ERROR: missing configuration for %s callback class';
+    public const ERR_CALLBACK = 'ERROR: unable to process callback: missing configuration?';
+    public const ERR_CALLBACK_CLASS = 'ERROR: unable to process callback: missing configuration for %s class?';
     public $config = [];
-    public $export = [];
+    public $export = [];            // import template config
+    public $item   = [];            // config to build "item" node
     public $extract = NULL;         // instance of Extract class
     public $writer = NULL;          // XmlWriter instance
     public $template = NULL;        // DOMDocument representing the import template
-    public $article = NULL;         // DOMDocument representing the WP article
     public $callbackManager = NULL; // stores additional callbacks (for future expansion)
     /**
      * Initializes delimiters and creates transform callback array
      *
      * @param MercuryFree\Import\Extract $extract : class with methods able to fulfill WXR requirements
-     * @param array $config : ['export' => ['rss' => [attribs], 'channel' => [WXR nodes]]]
+     * @param array $config : ['export' => ['rss' => [attribs], 'channel' => [WXR nodes]], 'item' => [config for building "item" node]]
      */
     public function __construct(Extract $extract, array $config)
     {
         // bail out if unable to open $fn
         $this->err = [];
         $this->config  = $config;
-        $this->export = $config['export'] ?? [];
+        $this->export  = $config['export'] ?? [];
+        $this->item    = $config['item']   ?? [];
         $this->extract = $extract;
         $this->writer  = new XmlWriter();
         $this->callbackManager = new SplObjectStorage();
+        $this->addCallback($extract, Extract::class);
+    }
+    /**
+     * Retrieves class instance from callbackManager
+     *
+     * @param string $name : name of class to retrieve
+     * @return object|NULL $obj
+     */
+    public function getCallback(string $name)
+    {
+        $this->callbackManager->rewind();
+        foreach ($this->callbackManager as $obj)
+            if ($obj instanceof $name) return $obj;
+        return NULL;
+    }
+    /**
+     * Adds class instance to callbackManager
+     *
+     * @param object $obj
+     */
+    public function addCallback(object $obj)
+    {
+        return $this->callbackManager->attach($obj, get_class($obj));
     }
     /**
      * Adds CDATA text to a node
@@ -134,19 +159,22 @@ class BuildWXR
         $this->doAddNode($this->export['channel']);
         $this->writer->endElement();    // ends "channel"
         $this->writer->endElement();    // ends "rss"
-        $this->template = new DOMDocument($this->writer->outputMemory());
+        $this->template = new DOMDocument();
+        $this->template->loadXML($this->writer->outputMemory());
     }
     /**
      * Adds XML nested nodes pertaining to WordPress article
      *
-     * @param array $node = [key => value]
-     * @param mixed $value : value to  be added to node; if is_array($value), node is not closed
+     * @param array|null $item : override configuration for building "item" node
+     * @return DOMDocument $article : item (article) rendered as DOMDocument instance
      */
-    public function addArticle(array $node)
+    public function addArticle(?array $item = NULL)
     {
         $this->writer->openMemory();
         $this->writer->startDocument('1.0', 'UTF-8');
-        foreach ($node as $key => $value) {
+        $this->writer->startElement('item');
+        $item = $item ?? $this->item;
+        foreach ($item as $key => $value) {
             if (is_array($value)) {
                 $this->writer->startElement($key);
                 if (isset($value['CDATA'])) {
@@ -168,27 +196,31 @@ class BuildWXR
                 $this->writer->endElement();
             }
         }
-        $this->article = new DOMDocument($this->writer->outputMemory());
+        $this->writer->endElement();
+        $article = new DOMDocument();
+        $article->loadXML($this->writer->outputMemory());
+        return $article;
     }
     /**
      * Runs callbacks
      *
      * @param array $params  : ['class' => class name of callback, 'method' => method name, 'args' => optional arguments]
+     *                         or ['callable' => callable $callback, 'args' => optional arguments]
      * @param string $method : method name of callback
      * @param mixed  $args   : arguments to provide to callback
-     * @return mixed $result : result of callback
+     * @return mixed $result : result of callback | NULL if callback not found
      */
     public function doCallback(array $params)
     {
         $result = NULL;
-        switch ($class) {
-            case Extract::class :
-                $method = $params['method'] ??  'Unknown';
-                $args   = $params['args']   ?? NULL;
-                $result = $this->extract->$method($args);
-                break;
-            default :
-                $result = $this->useCallbackManager($params);
+        if (isset($params['callable'])) {
+            $args = $params['args'] ?? [];
+            $result = call_user_func($params['callable'], $args);
+        } elseif (isset($params['class'])) {
+            $result = $this->useCallbackManager($params);
+        } else {
+            error_log(__METHOD__ . ':' . static::ERR_CALLBACK);
+            $result = NULL;
         }
         return $result;
     }
@@ -204,27 +236,26 @@ class BuildWXR
      */
     public function useCallbackManager(array $params)
     {
+        $result = NULL;
         $class  = $params['class']  ?? 'Unknown';
         $method = $params['method'] ??  'Unknown';
         $args   = $params['args']   ?? NULL;
         // scan to see if $class already exists
         $this->callbackManager->rewind();
-        foreach ($this->callbackManager as $obj) {
-            if ($obj instanceof $class) {
-                return $obj->$method($this, $args);
-            }
-        }
+        $obj = $this->getCallback($class);
+        if (!empty($obj))
+            return $obj->$method($args, $this) ?? NULL;
         // if we get to this point, the callback class is not registered
-        $result = NULL;
         try {
             // pull config for this callback class
             $config = $this->config[$class] ?? [];
             if (empty($config))
-                throw new Exception(sprintf(static::ERR_CALLBACK, $class));
+                throw new Exception(sprintf(static::ERR_CALLBACK_CLASS, $class));
             // if we have config create the instance, store it and use it
             $callback = new $class($config);
-            $this->callbackManager->attach($callback, $class);
-            $result = $callback->$method($this, $params);
+            $this->addCallback($callback, $class);
+            // call method and pass $args and instance of this class
+            $result = $callback->$method($args, $this);
         } catch (Throwable $t) {
             error_log(__METHOD__ . ':' . $t->getMessage());
         }

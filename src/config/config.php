@@ -18,21 +18,21 @@ $config = [
             ],
         ],
         'channel' => [
-            'title' => 'mercurysafeandmercuryfree.com',
-            'link' => 'https://mercurysafeandmercuryfree.com',
-            'description' => 'Dr. Tom McGuire’s Mercury Safe Dentist Internet Directory',
+            'title' => 'website title',
+            'link' => 'https://website.com',
+            'description' => 'Website description',
             'pubDate' => date(DATE_RSS),
             'language' => 'en-US',
             'wp:wxr_version' => '1.2',
-            'wp:base_site_url' => 'https://mercurysafeandmercuryfree.com',
-            'wp:base_blog_url' => 'https://mercurysafeandmercuryfree.com',
+            'wp:base_site_url' => 'https://website.com',
+            'wp:base_blog_url' => 'https://blog.website.com',
             'wp:author' => [
                 'wp:author_id' => '1',
-                'wp:author_login' => ['CDATA' => 'tom_wp'],
-                'wp:author_email' => ['CDATA' => 'tom@tommcguiredds.com'],
-                'wp:author_display_name' => ['CDATA' => 'tom_wp'],
-                'wp:author_first_name' => ['CDATA' => 'Tom'],
-                'wp:author_last_name' => ['CDATA' => 'McGuire'],
+                'wp:author_login' => ['CDATA' => 'author'],
+                'wp:author_email' => ['CDATA' => 'email@website.com'],
+                'wp:author_display_name' => ['CDATA' => 'Author'],
+                'wp:author_first_name' => ['CDATA' => 'Fred'],
+                'wp:author_last_name' => ['CDATA' => 'Flintstone'],
             ],
             'generator' => 'https://wordpress.org/?v=5.8',
         ],
@@ -48,7 +48,7 @@ $config = [
             'callback' => [
                 'class' => Extract::class,
                 'method' => 'getWpLink',
-                'args' => 'https://mercurysafeandmercuryfree.com'
+                'args' => 'https://website.com'
             ]
         ],
         'pubDate' => [
@@ -58,7 +58,7 @@ $config = [
             ]
         ],
         'dc:creator' => ['CDATA' => 'tom_wp'],
-        // 'guid isPermaLink="false"' => https://mercurysafeandmercuryfree.com/?p=1, guid' =>
+        // 'guid isPermaLink="false"' => https://website.com/?p=1, guid' =>
         'description' => [
             'callback' => [
                 'class' => Extract::class,
