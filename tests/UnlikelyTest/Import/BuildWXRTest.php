@@ -1,12 +1,12 @@
 <?php
-namespace UnlikelyTest\Import;
+namespace WP_CLI\UnlikelyTest\Import;
 
 use DateTime;
 use DateTimeZone;
 use Throwable;
 use XmlWriter;
 use SimpleXMLElement;
-use Unlikely\Import\{BuildWXR,Extract};
+use WP_CLI\Unlikely\Import\{BuildWXR,Extract};
 use PHPUnit\Framework\TestCase;
 class BuildWXRTest extends TestCase
 {

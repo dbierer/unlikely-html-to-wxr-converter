@@ -1,5 +1,5 @@
 <?php
-namespace Unlikely\Import;
+namespace WP_CLI\Unlikely\Import;
 
 
 /*

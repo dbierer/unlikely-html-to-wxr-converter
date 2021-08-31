@@ -1,7 +1,7 @@
 <?php
-namespace UnlikelyTest\Import\Transform;
+namespace WP_CLI\UnlikelyTest\Import\Transform;
 
-use Unlikely\Import\Transform\{Clean,TransformInterface};
+use WP_CLI\Unlikely\Import\Transform\{Clean,TransformInterface};
 use PHPUnit\Framework\TestCase;
 class CleanTest extends TestCase
 {

@@ -1,7 +1,7 @@
 <?php
-namespace UnlikelyTest\Import\Transform;
+namespace WP_CLI\UnlikelyTest\Import\Transform;
 
-use Unlikely\Import\Transform\{RemoveAttributes,TransformInterface};
+use WP_CLI\Unlikely\Import\Transform\{RemoveAttributes,TransformInterface};
 use PHPUnit\Framework\TestCase;
 class RemoveAttributesTest extends TestCase
 {

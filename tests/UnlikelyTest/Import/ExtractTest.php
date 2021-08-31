@@ -1,10 +1,10 @@
 <?php
-namespace UnlikelyTest\Import;
+namespace WP_CLI\UnlikelyTest\Import;
 
 use DateTime;
 use DateTimeZone;
 use Throwable;
-use Unlikely\Import\Extract;
+use WP_CLI\Unlikely\Import\Extract;
 use PHPUnit\Framework\TestCase;
 class ExtractTest extends TestCase
 {

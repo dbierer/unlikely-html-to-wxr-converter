@@ -1,5 +1,67 @@
 {
+    "name": "unlikely/html-to-wxr",
+    "type": "wp-cli-package",
+    "description": "Converts HTML to WXR import files",
+    "homepage": "https://unlikelysource.com",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Doug Bierer",
+            "email": "doug@unlikelysource.com",
+            "homepage": "https://unlikelysource.com",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": ">=7.1",
+        "wp-cli/wp-cli": "^2.5"
+    },
     "require-dev": {
-        "phpunit/phpunit": "^9.5"
+        "wp-cli/wp-cli-tests": "^3.0.11"
+    },
+    "config": {
+        "process-timeout": 7200,
+        "sort-packages": true
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-master": "2.x-dev"
+        },
+        "bundled": false,
+        "commands": [
+            "html-to-wxr"
+        ]
+    },
+    "autoload": {
+        "psr-4": {
+            "WP_CLI\\Unlikely\\": "src/Unlikely/"
+        },
+        "files": [
+            "html-to-wxr-command.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "WP_CLI\\UnlikelyTest\\": "tests/UnlikelyTest/"
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "scripts": {
+        "behat": "run-behat-tests",
+        "behat-rerun": "rerun-behat-tests",
+        "lint": "run-linter-tests",
+        "phpcs": "run-phpcs-tests",
+        "phpunit": "run-php-unit-tests",
+        "prepare-tests": "install-package-tests",
+        "test": [
+            "@lint",
+            "@phpcs",
+            "@phpunit",
+            "@behat"
+        ]
+    },
+    "support": {
+        "issues": "https://github.com/unlikely/html-to-wxr/issues"
     }
 }

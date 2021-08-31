@@ -23,7 +23,7 @@
  *
  *
  */
-namespace Unlikely\HtmlWxrConvert;
+namespace WP_CLI\Unlikely\HtmlWxrConvert;
 
 class Admin
 {

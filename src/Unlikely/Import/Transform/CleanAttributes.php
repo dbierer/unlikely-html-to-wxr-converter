@@ -1,5 +1,5 @@
 <?php
-namespace Unlikely\Import\Transform;
+namespace WP_CLI\Unlikely\Import\Transform;
 
 /*
  * Unlikely\Import\Transform\CleanAttributes

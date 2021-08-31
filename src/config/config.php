@@ -1,8 +1,8 @@
 <?php
 // provides configuration for WP import/export tool
 
-use Unlikely\Import\Extract;
-use Unlikely\Import\Transform\{CleanAttributes,Clean,RemoveAttributes};
+use WP_CLI\Unlikely\Import\Extract;
+use WP_CLI\Unlikely\Import\Transform\{CleanAttributes,Clean,RemoveAttributes};
 $config = [
     // main config for WP export
     'export' => [
@@ -147,11 +147,11 @@ $config = [
     // main extraction
     //**********************************************
     Extract::class => [
-        'attrib_list'  => Extract::DEFAULT_ATTR_LIST,    // list of attributes to strip
-        'delim_start'  => Extract::DELIM_START,          // marks beginning of contents to extract
-        'delim_stop'   => Extract::DELIM_STOP,           // marks end of contents to extract
-        'title_regex'  => Extract::TITLE_REGEX,          // regex to extract title
-        'excerpt_tags' => Extract::EXCERPT_TAGS,       // tags(s) to search for to locate extract
+        'attrib_list'  => Extract::DEFAULT_ATTR_LIST,   // list of attributes to strip
+        'delim_start'  => Extract::DELIM_START,         // marks beginning of contents to extract
+        'delim_stop'   => Extract::DELIM_STOP,          // marks end of contents to extract
+        'title_regex'  => Extract::TITLE_REGEX,         // regex to extract title
+        'excerpt_tags' => Extract::EXCERPT_TAGS,        // tags(s) to search for to locate extract
         'transform' => [
             'clean' => [
                 'callback' => new Clean(),
