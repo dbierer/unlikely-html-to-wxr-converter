@@ -29,20 +29,25 @@ namespace WP_CLI\Unlikely\Import;
  */
 
 use Exception;
+use BadMethodCallException;
+use InvalidArgumentException;
 use DateTime;
 use DateTimeZone;
 use XmlWriter;
 use SplFileObject;
-use SplObjectStorage;
 use DOMDocument;
+use ArrayIterator;
 
 class BuildWXR
 {
     public const ERR_CALLBACK = 'ERROR: unable to process callback: missing configuration?';
     public const ERR_CALLBACK_CLASS = 'ERROR: unable to process callback: missing configuration for %s class?';
+    public const ERR_CALLBACK_METHOD = 'ERROR: unable to process callback method: missing configuration for %s class?';
+    public const ERR_CALLBACK_INVALID = 'ERROR: callback must implement Unlikely\Import\BuildWXRInterface';
     public $config = [];
     public $export = [];            // import template config
     public $item   = [];            // config to build "item" node
+    public $wxr    = NULL;            // WXR document (DOMDocument)
     public $extract = NULL;         // instance of Extract class
     public $writer = NULL;          // XmlWriter instance
     public $template = NULL;        // DOMDocument representing the import template
@@ -50,20 +55,28 @@ class BuildWXR
     /**
      * Initializes delimiters and creates transform callback array
      *
-     * @param MercuryFree\Import\Extract $extract : class with methods able to fulfill WXR requirements
      * @param array $config : ['export' => ['rss' => [attribs], 'channel' => [WXR nodes]], 'item' => [config for building "item" node]]
      */
-    public function __construct(Extract $extract, array $config)
+    public function __construct(array $config)
     {
         // bail out if unable to open $fn
         $this->err = [];
         $this->config  = $config;
         $this->export  = $config['export'] ?? [];
         $this->item    = $config['item']   ?? [];
-        $this->extract = $extract;
         $this->writer  = new XmlWriter();
-        $this->callbackManager = new SplObjectStorage();
-        $this->addCallback($extract, Extract::class);
+        $this->callbackManager = new ArrayIterator();
+    }
+    /**
+     * Sets new Extract instance
+     *
+     * @param Extract $extract : new Extract instance
+     * @return void
+     */
+    public function setExtract(Extract $extract)
+    {
+        $this->extract = $extract;
+        $this->addCallback($extract);
     }
     /**
      * Retrieves class instance from callbackManager
@@ -73,19 +86,19 @@ class BuildWXR
      */
     public function getCallback(string $name)
     {
-        $this->callbackManager->rewind();
-        foreach ($this->callbackManager as $obj)
-            if ($obj instanceof $name) return $obj;
-        return NULL;
+        return ($this->callbackManager->offsetExists($name))
+                ? $this->callbackManager->offsetGet($name)
+                : NULL;
     }
     /**
      * Adds class instance to callbackManager
      *
-     * @param object $obj
      */
     public function addCallback(object $obj)
     {
-        return $this->callbackManager->attach($obj, get_class($obj));
+        if (!$obj instanceof BuildWXRInterface)
+            throw new InvalidArgumentException(self::ERR_CALLBACK_INVALID);
+        $this->callbackManager->offsetSet(get_class($obj), $obj);
     }
     /**
      * Adds CDATA text to a node
@@ -121,6 +134,7 @@ class BuildWXR
         foreach ($node as $key => $value) {
             if (is_array($value)) {
                 $this->writer->startElement($key);
+                error_log(__METHOD__ . ':' . $key . ':' . var_export($value, TRUE));
                 if (isset($value['CDATA'])) {
                     $this->writer->text($this->addCdata($value['CDATA']));
                 } else {
@@ -129,11 +143,28 @@ class BuildWXR
                 }
                 $this->writer->endElement();
             } else {
+                error_log(__METHOD__ . ':' . $key . ':' . var_export($value, TRUE));
                 $this->writer->startElement($key);
                 $this->writer->text($value);
                 $this->writer->endElement();
             }
         }
+    }
+    /**
+     * Assembles article into template
+     *
+     *
+     * @param array|null $item : override configuration for building "item" node
+     * @return DOMDocument : article rendered as DOMDocument instance into template
+     */
+    public function assembleWXR(?array $item = NULL)
+    {
+        if (empty($this->template))
+            $this->template = $this->buildTemplate();
+        $article = $this->addArticle($item);
+        $this->wxr = clone $this->template;
+        $this->wxr->appendChild($article);
+        return $this->wxr;
     }
     /**
      * Builds import XML template
@@ -241,10 +272,13 @@ class BuildWXR
         $method = $params['method'] ??  'Unknown';
         $args   = $params['args']   ?? NULL;
         // scan to see if $class already exists
-        $this->callbackManager->rewind();
         $obj = $this->getCallback($class);
-        if (!empty($obj))
-            return $obj->$method($args, $this) ?? NULL;
+        if (!empty($obj) && is_object($obj)) {
+            if (!method_exists($obj, $method))
+                throw new BadMethodCallException(sprintf(static::ERR_CALLBACK_METHOD, $class));
+            $obj->setBuildWXRInstance($this);
+            return $obj->$method($args) ?? NULL;
+        }
         // if we get to this point, the callback class is not registered
         try {
             // pull config for this callback class
@@ -252,8 +286,8 @@ class BuildWXR
             if (empty($config))
                 throw new Exception(sprintf(static::ERR_CALLBACK_CLASS, $class));
             // if we have config create the instance, store it and use it
-            $callback = new $class($config);
-            $this->addCallback($callback, $class);
+            $callback = new $class(...$config);
+            $this->addCallback($callback);
             // call method and pass $args and instance of this class
             $result = $callback->$method($args, $this);
         } catch (Throwable $t) {

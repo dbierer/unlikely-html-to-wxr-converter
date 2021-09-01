@@ -32,7 +32,7 @@ use DateTime;
 use DateTimeZone;
 use SplFileObject;
 
-class Extract
+class Extract implements BuildWXRInterface
 {
     public const DELIM_START  = '<!--#include virtual ="/sidemenu_include.html" -->';
     public const DELIM_STOP   = '<!--#include virtual ="/footer_include.html" -->';
@@ -67,6 +67,10 @@ class Extract
         $this->config    = $config[__CLASS__] ?? [];
         $this->file_obj  = new SplFileObject($fn, 'r');
     }
+    public function setBuildWXRInstance(BuildWXR $build)
+    {
+        /* do nothing */
+    }
     /**
      * Grabs contents of the file
      * Removes "\r"
@@ -95,10 +99,10 @@ class Extract
     /**
      * Returns creation date of file
      *
-     * @param string $tz : timezone : if blank, don't use
+     * @param ?string $tz : timezone : if blank, don't use
      * @return string $date in RSS format
      */
-    public function getCreateDate(string $tz = '') : string
+    public function getCreateDate(?string $tz = '') : string
     {
         $tz  = (empty($tz)) ? static::DEFAULT_TZ : $tz;
         $obj = new DateTime('@' . $this->file_obj->getCTime());
@@ -108,10 +112,10 @@ class Extract
     /**
      * Returns modification date of file
      *
-     * @param string $tz : timezone : if blank, don't use
+     * @param ?string $tz : timezone : if blank, don't use
      * @return string $date in RSS format
      */
-    public function getModifyDate(string $tz = '') : string
+    public function getModifyDate(?string $tz = '') : string
     {
         $tz  = (empty($tz)) ? static::DEFAULT_TZ : $tz;
         $obj = new DateTime('@' . $this->file_obj->getMTime());
@@ -217,10 +221,10 @@ class Extract
      * Extracts content between delimiters and returns clean HTML
      * NOTE: requires the "tidy" extension to be enabled
      *
-     * @param array $err : error messages (passed by reference)
+     * @param ?array $err : error messages (passed by reference)
      * @return string $html : clean HTML; returns '' if unable to process content
      */
-    public function getHtml(array &$err = [])
+    public function getHtml(?array &$err = [])
     {
         // init vars
         $html = '';

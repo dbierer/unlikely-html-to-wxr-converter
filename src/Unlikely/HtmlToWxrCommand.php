@@ -1,13 +1,34 @@
 <?php
 namespace WP_CLI\Unlikely;
+/**
+ * Main wp-cli command class
+ *
+ * @author doug@unlikelysource.com
+ * @date 2021-09-01
+ * Copyright 2021 unlikelysource.com
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ * MA 02110-1301, USA.
+ *
+ */
 
-use ArrayObject;
 use WP_CLI;
 use WP_CLI_Command;
 
 class HtmlToWxrCommand extends WP_CLI_Command
 {
-    public const STATUS_ERR     = 'ERROR';
     public const ERROR_POS_ARGS = 'ERROR: path to config file and/or destination directory to write WXR files missing or invalid';
     public const ERROR_SINGLE   = 'ERROR: single file not found';
     public const ERROR_SRC      = 'ERROR: source directory path not found';
@@ -58,36 +79,25 @@ class HtmlToWxrCommand extends WP_CLI_Command
     ];
     public $arg_container;
     /**
-     * Sets up arguments container
-     */
-    public function __construct()
-    {
-        $this->arg_container = new class () extends ArrayObject
-        {
-            public $status = 'OK';
-            public $error_msg = [];
-            public function addErrorMessage($msg)
-            {
-                $this->status = HtmlToWxrCommand::STATUS_ERR;
-                $this->error_msg[] = $msg;
-            }
-            public function getErrorMessages()
-            {
-                return implode("\n", $this->error_msg);
-            }
-        };
-    }
-    /**
      * @param array $args       Indexed array of positional arguments.
      * @param array $assoc_args Associative array of associative arguments.
      */
-    public function __invoke( $args, $assoc_args )
+    public function __invoke($args, $assoc_args)
     {
-        $obj = $this->sanitizeParams($args, $assoc_args);
-        if ($obj->status === self::STATUS_ERR) {
-            WP_CLI::error($obj->getErrorMessages());
-            exit;
+        $args_container = $this->sanitizeParams($args, $assoc_args);
+        if ($args_container->status === ArgsContainer::STATUS_ERR) {
+            WP_CLI::error_multi_line($obj->getErrorMessages(), TRUE);
         }
+        // read config
+        // if single, convert single file
+            // create Extract instance
+            // run assembleWXR()
+            // write XML to file with same name as HTMML
+        // otherwise build a list of files
+        // loop through list
+            // create Extract instance
+            // run assembleWXR()
+            // write XML to file with same name as HTMML
     }
     /**
      * Sanitizes incoming args
@@ -101,26 +111,27 @@ class HtmlToWxrCommand extends WP_CLI_Command
     protected function sanitizeParams(array $args, array $assoc)
     {
         // santize $config param
+        $args_container = new ArgsContainer();
         $config = WP_CLI::line($args[0]) ?? '';
         $dest_dir = WP_CLI::line($args[1]) ?? '';
         if (empty($config) || empty($dest_dir) || !file_exists($config) || !file_exists($dest_dir)) {
-            $this->arg_container->addErrorMessage(self::ERROR_POS_ARGS);
-            return $this->arg_container;
+            $args_container->addErrorMessage(self::ERROR_POS_ARGS);
+            return $args_container;
         } else {
-            $this->arg_container->offsetSet('config', $config);
-            $this->arg_container->offsetSet('dest', $dest_dir);
+            $args_container->offsetSet('config', $config);
+            $args_container->offsetSet('dest', $dest_dir);
         }
         // grab optional params
-        $src = WP_CLI::line($assoc_args['src']) ?? \WP_CLI\Utils\get_home_dir();
-        $single =  WP_CLI::line($assoc_args['single']) ?? '';
-        $ext = WP_CLI::line($assoc_args['ext']) ?? 'html';
+        $src    = WP_CLI::line($assoc_args['src']) ?? \WP_CLI\Utils\get_home_dir();
+        $single = WP_CLI::line($assoc_args['single']) ?? '';
+        $ext    = WP_CLI::line($assoc_args['ext']) ?? 'html';
         // sanitize $src param
         if (!file_exists($src)) {
             error_log(__METHOD__ . ':' . __LINE__ . ':' . self::ERROR_SRC . ':' . $src);
-            $this->arg_container->addErrorMessage(self::ERROR_SRC);
-            return $this->arg_container;
+            $args_container->addErrorMessage(self::ERROR_SRC);
+            return $args_container;
         } else {
-            $this->arg_container->offsetSet('src', $src);
+            $args_container->offsetSet('src', $src);
         }
         // sanitize $single param
         if (!empty($single)) {
@@ -130,10 +141,10 @@ class HtmlToWxrCommand extends WP_CLI_Command
                 $fn = str_replace($double, DIRECTORY_SEPARATOR, $fn);
                 if (!file_exists($fn)) {
                     error_log(__METHOD__ . ':' . __LINE__ . ':' . self::ERROR_SINGLE . ':' . $fn);
-                    $this->arg_container->addErrorMessage(self::ERROR_SINGLE);
-                    return $this->arg_container;
+                    $args_container->addErrorMessage(self::ERROR_SINGLE);
+                    return $args_container;
                 } else {
-                    $this->arg_container->offsetSet('single', $single);
+                    $args_container->offsetSet('single', $single);
                 }
             }
         }
@@ -143,7 +154,7 @@ class HtmlToWxrCommand extends WP_CLI_Command
         } else {
             $ext = [$ext];
         }
-        $this->arg_container->offsetSet('ext', $ext);
-        return $this->arg_container;
+        $args_container->offsetSet('ext', $ext);
+        return $args_container;
     }
 }

@@ -59,10 +59,10 @@ class ExtractTest extends TestCase
     {
         $fn  = __DIR__ . '/../../../data/symptoms.html';
         $fdate = new DateTime('@' . filectime($fn));
-        $fdate->setTimeZone(new DateTimeZone('UTC'));
+        $fdate->setTimeZone(new DateTimeZone('PST'));
         $extract = new Extract($fn, $this->config);
         $expected = $fdate->format(DATE_RSS);
-        $actual   = $extract->getCreateDate('UTC');
+        $actual   = $extract->getCreateDate();
         $this->assertEquals($expected, $actual, 'Create date does not match');
     }
     public function testGetCreateDateUtc()

@@ -1,9 +1,10 @@
 <?php
-/*
- * Admin.php
+namespace WP_CLI\Unlikely;
+/**
+ * Contains sanitized incoming args + errors
  *
  * @author doug@unlikelysource.com
- * @date 2021-08-25
+ * @date 2021-09-01
  * Copyright 2021 unlikelysource.com
  *
  * This program is free software; you can redistribute it and/or modify
@@ -21,19 +22,23 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301, USA.
  *
- *
  */
-namespace WP_CLI\Unlikely\HtmlWxrConvert;
 
-class Admin
+use ArrayObject;
+
+class ArgsContainer extends ArrayObject
 {
-    public const USAGE = <<<EOT
-This plugin is designed for command line operation using WP-CLI.
-For more information on WP-CLI see: https://wp-cli.org/.
-Admin UI usage will come in phase II of the development of this plugin.
-Open a terminal window or command prompt and change to your WP installation directory.
-
-Usage:
-
-EOT;
+    public const STATUS_OK = 200;
+    public const STATUS_ERR = 500;
+    public $status = self::STATUS_OK;
+    public $error_msg = [];
+    public function addErrorMessage($msg)
+    {
+        $this->status = self::STATUS_ERR;
+        $this->error_msg[] = $msg;
+    }
+    public function getErrorMessages()
+    {
+        return implode("\n", $this->error_msg);
+    }
 }

@@ -1,10 +1,14 @@
 <?php
-namespace WP_CLI\Unlikely;
-/**
- * Program to invoke main command class
+namespace WP_CLI\Unlikely\Import;
+
+
+/*
+ * Unlikely\Import\BuildWXRInterface
+ *
+ * Defines callback functionality
  *
  * @author doug@unlikelysource.com
- * @date 2021-09-01
+ * @date 2021-08-21
  * Copyright 2021 unlikelysource.com
  *
  * This program is free software; you can redistribute it and/or modify
@@ -23,14 +27,8 @@ namespace WP_CLI\Unlikely;
  * MA 02110-1301, USA.
  *
  */
-require __DIR__ . '/vendor/autoload.php';
-use WP_CLI;
-use WP_CLI\Unlikely\HtmlToWxrCommand;
-if ( ! class_exists( 'WP_CLI' ) ) {
-    return;
+
+interface BuildWXRInterface
+{
+    public function setBuildWXRInstance(BuildWXR $build);
 }
-WP_CLI::add_command(
-    'html-to-wxr',
-    HtmlToWxrCommand::class,
-    HtmlToWxrCommand::SYNOPSIS
-);
