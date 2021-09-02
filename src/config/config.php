@@ -2,7 +2,13 @@
 // provides configuration for WP import/export tool
 
 use WP_CLI\Unlikely\Import\Extract;
-use WP_CLI\Unlikely\Import\Transform\{CleanAttributes,Clean,RemoveAttributes};
+use WP_CLI\Unlikely\Import\Transform\{
+    CleanAttributes,
+    Clean,
+    RemoveAttributes,
+    RemoveBlock,
+    TableToDiv
+};
 $config = [
     // main config for WP export
     'export' => [

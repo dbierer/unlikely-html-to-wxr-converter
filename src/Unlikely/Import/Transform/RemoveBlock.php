@@ -47,17 +47,30 @@ class RemoveBlock implements TransformInterface
      */
     public function __invoke(string $html, array $params = []) : string
     {
-        $this->start = $params['start'] ?? '';
-        $this->stop  = $params['stop']  ?? '';
-        $this->items = $params['items'] ?? [];
-        if (empty($this->start) || empty($this->stop) || empty($this->items))
-            throw new InvalidArgumentException(self::ERR_PARAMS);
+        $this->init($params);
         if ($this->getStartAndStop($html)) {
             if ($this->confirm($html, $this->items)) {
                 $html = $this->remove($html);
             }
         }
         return $html;
+    }
+    /**
+     * Initializes properties
+     *
+     * @param array $params : ['start' => : starting string for block to be removed,
+     *                         'stop'  => : ending string for block to be removed; must occur *after* start string
+     *                         'items' => : array of strings that occur between "start" and "stop", used to correctly identify block to be removed
+     * @return void
+     * @throws InvalidArgumentException
+     */
+    public function init(array $params) : void
+    {
+        $this->start = $params['start'] ?? '';
+        $this->stop  = $params['stop']  ?? '';
+        $this->items = $params['items'] ?? [];
+        if (empty($this->start) || empty($this->stop) || empty($this->items))
+            throw new InvalidArgumentException(self::ERR_PARAMS);
     }
     /**
      * Populates $this->beg_pos and $this->end_pos
@@ -67,31 +80,30 @@ class RemoveBlock implements TransformInterface
      */
     public function getStartAndStop(string $contents)
     {
-        $this->begin_pos = strpos($contents, $this->start);
-        $this->end_pos   = strpos($contents, $this->stop);
+        $this->beg_pos = strpos($contents, $this->start);
+        $this->end_pos = strpos($contents, $this->stop);
         $valid = 4;
         $found = 0;
-        $found += (int) (is_int($this->begin_pos));
+        $found += (int) (is_int($this->beg_pos));
         $found += (int) (is_int($this->end_pos));
         $found += (int) (((int) $this->end_pos) < strlen($contents));
-        $found += (int) ($this->begin_pos < $this->end_pos);
+        $found += (int) ($this->beg_pos < $this->end_pos);
         return ($found === $valid);
     }
     /**
      * Confirms that all items in $search exist between $this->start and $this->stop
      *
      * @param string $contents : document to be searched
-     * @param array $search    : array of strings that confirm block to be removed
      * @return bool TRUE if all items found; FALSE otherwise
      */
-    public function confirm(string $contents, array $search)
+    public function confirm(string $contents)
     {
-        $max = count($search);
+        $max = count($this->items);
         $found = 0;
-        foreach ($search as $needle) {
+        foreach ($this->items as $needle) {
             $pos = strpos($contents, $needle);
             if ($pos !== FALSE
-                && $pos > $this->begin_pos
+                && $pos > $this->beg_pos
                 && $pos < $this->end_pos) { $found++; }
         }
         return ($found === $max);
@@ -103,9 +115,11 @@ class RemoveBlock implements TransformInterface
      */
     public function remove(string $contents)
     {
-        $end += strlen($this->end_pos);
+        $begin = $this->beg_pos;
+        $end   = $this->end_pos + strlen($this->stop);
         $first = substr($contents, 0, $begin);
-        $last  = substr($contents, $this->end_pos);
+        $last  = substr($contents, $end);
         $contents = $first . $last;
+        return $contents;
     }
 }

@@ -45,11 +45,39 @@ class TableToDiv implements TransformInterface
      */
     public function __invoke(string $html, array $params = []) : string
     {
-        $this->col   = $params['col'] ?? '';
-        $this->row   = $params['row'] ?? '';
-        $this->width = $params['width']  ?? [];
+        $this->init($params);
+        $html = $this->convertRow($html);
+        $html = $this->convertCol($html);
+        return $html;
+    }
+    /**
+     * Initializes properties
+     *
+     * @param array $params : ['col'   => : sprintf() pattern for column <div> tags
+     *                         'row'   => : row class
+     *                         'width' => : represents the max value for col class (default 12)
+     * @return void
+     * @throws InvalidArgumentException
+     */
+    public function init(array $params) : void
+    {
+        $this->col   = $params['col']   ?? '';
+        $this->row   = $params['row']   ?? '';
+        $this->width = $params['width'] ?? [];
         if (empty($this->col) || empty($this->row) || empty($this->width))
             throw new InvalidArgumentException(self::ERR_PARAMS);
+    }
+    /**
+     * Removes "<table>" and "</table>"
+     *
+     * @param string $html : HTML string to be cleaned
+     * @return string $html : HTML with table tags removed
+     */
+    public function removeTableTags(string $html) : string
+    {
+        $search = '!<table.*?>!i';
+        $html = preg_replace($search, '', $html);
+        $html = str_ireplace('</table>', '', $html);
         return $html;
     }
     /**
@@ -76,6 +104,10 @@ class TableToDiv implements TransformInterface
     {
         // search for <td>|<th> with "width=" attribute
         $patt = '<td.*?width="(.+?)".*?>!i';
+        $matches = [];
+        preg_match_all($patt, $html, $matches);
+        return $matches;
+        /*
             // if "%" type width: determine width % with col pattern where 100% === col-XX-{$this->width}
             // if "px" or "pt" or just a number type width: determine width % with col pattern where NNN(px|pt)? === col-XX-{$this->width}
         // if no "width" then count the # <td>|<th> elements between <tr></tr>
@@ -84,5 +116,6 @@ class TableToDiv implements TransformInterface
         $html = preg_replace($search, '<div class="' . $this->row . '">', $html);
         $html = str_ireplace(['</td>','</th>'], ['</div>','</b></div>'], $html);
         return $html;
+        */
     }
 }

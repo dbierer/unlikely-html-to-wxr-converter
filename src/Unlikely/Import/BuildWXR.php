@@ -134,7 +134,6 @@ class BuildWXR
         foreach ($node as $key => $value) {
             if (is_array($value)) {
                 $this->writer->startElement($key);
-                error_log(__METHOD__ . ':' . $key . ':' . var_export($value, TRUE));
                 if (isset($value['CDATA'])) {
                     $this->writer->text($this->addCdata($value['CDATA']));
                 } else {
@@ -143,7 +142,6 @@ class BuildWXR
                 }
                 $this->writer->endElement();
             } else {
-                error_log(__METHOD__ . ':' . $key . ':' . var_export($value, TRUE));
                 $this->writer->startElement($key);
                 $this->writer->text($value);
                 $this->writer->endElement();
