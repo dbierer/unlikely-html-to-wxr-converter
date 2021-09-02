@@ -157,9 +157,17 @@ $config = [
                 'callback' => new Clean(),
                 'params' => ['bodyOnly' => TRUE]
             ],
+            'remove_block' => [
+                'callback' => new RemoveBlock(),
+                'params' => ['start' => '<tr height="20">','stop' => '</tr>','items' => ['bkgnd_tandk.gif','trans_spacer50.gif','bkgnd_tanlt.gif']],
+            ],
             'attribs_remove' => [
                 'callback' => new RemoveAttributes(),
                 'params' => ['attributes' => Extract::DEFAULT_ATTR_LIST]
+            ],
+            'table_to_row_col_div' => [
+                'callback' => new TableToDiv(),
+                'params' => ['col' => 'col-md-%d', 'row' => 'row', 'width' => 12],
             ],
         ],
     ],
