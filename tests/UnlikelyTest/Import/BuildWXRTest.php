@@ -83,27 +83,6 @@ class BuildWXRTest extends TestCase
         $actual = $this->build->writer->outputMemory();
         $this->assertEquals($expected, $actual, 'Nested nodes with CDATA not built correctly');
     }
-    public function testBuildTemplateReturnsDOMDocument()
-    {
-        $this->build->buildTemplate();
-        $expected = 'DOMDocument';
-        $actual   = get_class($this->build->template);
-        $this->assertEquals($expected, $actual, 'buildTemplate() does not create SimpleXMLElement instance');
-    }
-    public function testBuildTemplateAddsRssNode()
-    {
-        $this->build->buildTemplate();
-        $expected = TRUE;
-        $actual   = strpos($this->build->template->saveXML(), '</rss>');
-        $this->assertEquals($expected, $actual, 'buildTemplate() does not create RSS node');
-    }
-    public function testBuildTemplateAddsChannelNode()
-    {
-        $this->build->buildTemplate();
-        $expected = TRUE;
-        $actual   = strpos($this->build->template->saveXML(), '</channel>');
-        $this->assertEquals($expected, $actual, 'buildTemplate() does not create "channel" node');
-    }
     public function testAddCallbackStoresObject()
     {
         $before = count($this->build->callbackManager);
@@ -146,14 +125,24 @@ class BuildWXRTest extends TestCase
     }
     public function testAddArticleReturnsXML()
     {
-        $article = $this->build->addArticle([]);
+        $this->build->writer->openMemory();
+        $this->build->writer->startDocument('1.0', 'UTF-8');
+        $this->build->writer->startElement('item');
+        $this->build->addArticle([]);
+        $this->build->writer->endElement();
+        $article = $this->build->writer->outputMemory();
         $expected = '<?xml version="1.0" encoding="UTF-8"?>';
         $actual   = substr($article, 0, 38);
         $this->assertEquals($expected, $actual, 'buildTemplate() does not create XML');
     }
     public function testAddArticleAddsSingleTextNode()
     {
-        $article = $this->build->addArticle(['test' => 'TEST']);
+        $this->build->writer->openMemory();
+        $this->build->writer->startDocument('1.0', 'UTF-8');
+        $this->build->writer->startElement('item');
+        $this->build->addArticle(['test' => 'TEST']);
+        $this->build->writer->endElement();
+        $article = $this->build->writer->outputMemory();
         $search  = '<test>TEST</test>';
         $expected = TRUE;
         $actual   = (bool) strpos($article, $search);
@@ -161,7 +150,12 @@ class BuildWXRTest extends TestCase
     }
     public function testAddArticleAddsSingleTextCDataNode()
     {
-        $article = $this->build->addArticle(['test' => ['CDATA' => 'TEST']]);
+        $this->build->writer->openMemory();
+        $this->build->writer->startDocument('1.0', 'UTF-8');
+        $this->build->writer->startElement('item');
+        $this->build->addArticle(['test' => ['CDATA' => 'TEST']]);
+        $this->build->writer->endElement();
+        $article = $this->build->writer->outputMemory();
         $cdata = '<![CDATA[TEST]]>';
         $expected = TRUE;
         $actual = (bool) strpos($article, $cdata);
@@ -241,7 +235,12 @@ class BuildWXRTest extends TestCase
                     'method' => 'getTitle']
                 ]
         ];
-        $article = $this->build->addArticle($item);
+        $this->build->writer->openMemory();
+        $this->build->writer->startDocument('1.0', 'UTF-8');
+        $this->build->writer->startElement('item');
+        $this->build->addArticle($item);
+        $this->build->writer->endElement();
+        $article = $this->build->writer->outputMemory();
         $search = '<title>Chronic Mercury Poisoning: Symptoms &amp;amp; Diseases</title>';
         $expected = TRUE;
         $actual = (bool) strpos($article, $search);
@@ -257,7 +256,12 @@ class BuildWXRTest extends TestCase
                 ]
             ],
         ];
-        $article = $this->build->addArticle($item);
+        $this->build->writer->openMemory();
+        $this->build->writer->startDocument('1.0', 'UTF-8');
+        $this->build->writer->startElement('item');
+        $this->build->addArticle($item);
+        $this->build->writer->endElement();
+        $article = $this->build->writer->outputMemory();
         $search  = '<![CDATA[Chronic Mercury Poisoning: Symptoms &amp; Diseases]]>';
         $expected = TRUE;
         $actual = (bool) strpos($article, $search);
@@ -265,29 +269,43 @@ class BuildWXRTest extends TestCase
     }
     public function testAddArticleOnActualDocument()
     {
-        $article = $this->build->addArticle();
+        $this->build->writer->openMemory();
+        $this->build->writer->startDocument('1.0', 'UTF-8');
+        $this->build->writer->startElement('item');
+        $this->build->addArticle();
+        $this->build->writer->endElement();
+        $article = $this->build->writer->outputMemory();
         $expected = '<category domain="category" nicename="data"><![CDATA[data]]></category></item>';
         $pos = -1 * strlen($expected);
         $actual = substr($article, $pos);
         $this->assertEquals($expected, $actual, 'addArticle() does not work on full document');
     }
-    public function testAssembleWXRCreatesTemplate()
+    public function testbuildWxrReturnsSimpleXMLElement()
     {
-        $expected = TRUE;
-        $actual = empty($this->build->template);
-        $this->assertEquals($expected, $actual, 'Template should be initially empty');
-        $expected = FALSE;
-        $this->build->buildTemplate();
-        $actual = empty($this->build->template);
-        $this->assertEquals($expected, $actual, 'Template should not be empty after running buildTemplate()');
-    }
-    /*
-    public function testAssembleWXRCreatesWxrAsDOMDocument()
-    {
-        $wxr = $this->build->assembleWXR();
-        $expected = 'DOMDocument';
+        $wxr = $this->build->buildWxr();
+        $expected = 'SimpleXMLElement';
         $actual   = get_class($wxr);
-        $this->assertEquals($expected, $actual, 'WXR not created as DOMDocument');
+        $this->assertEquals($expected, $actual, 'buildWxr() does not create SimpleXMLElement instance');
     }
-    */
+    public function testBuildWxrAddsRssNode()
+    {
+        $wxr = $this->build->buildWxr(TRUE);
+        $expected = TRUE;
+        $actual   = strpos($wxr->asXML(), '</rss>');
+        $this->assertEquals($expected, $actual, 'buildWxr() does not create RSS node');
+    }
+    public function testBuildWxrAddsChannelNode()
+    {
+        $wxr = $this->build->buildWxr(TRUE);
+        $expected = TRUE;
+        $actual   = strpos($wxr->asXML(), '</channel>');
+        $this->assertEquals($expected, $actual, 'buildWxr() does not create "channel" node');
+    }
+    public function testBuildWxrAddsItemNode()
+    {
+        $wxr = $this->build->buildWxr();
+        $expected = TRUE;
+        $actual   = strpos($wxr->asXML(), '</item>');
+        $this->assertEquals($expected, $actual, 'buildWxr() does not create "item" node');
+    }
 }

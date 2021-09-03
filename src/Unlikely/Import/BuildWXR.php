@@ -36,7 +36,7 @@ use DateTime;
 use DateTimeZone;
 use XmlWriter;
 use SplFileObject;
-use DOMDocument;
+use SimpleXMLElement;
 use ArrayIterator;
 
 class BuildWXR
@@ -49,10 +49,10 @@ class BuildWXR
     public $config = [];
     public $export = [];            // import template config
     public $item   = [];            // config to build "item" node
-    public $wxr    = NULL;            // WXR document (DOMDocument)
+    public $wxr    = NULL;          // WXR document (SimpleXMLElement)
     public $extract = NULL;         // instance of Extract class
     public $writer = NULL;          // XmlWriter instance
-    public $template = NULL;        // DOMDocument representing the import template
+    public $template = NULL;        // XML representing the import template
     public $callbackManager = NULL; // stores additional callbacks (for future expansion)
     /**
      * Initializes delimiters and creates transform callback array
@@ -70,22 +70,6 @@ class BuildWXR
         $this->writer  = new XmlWriter();
         $this->callbackManager = new ArrayIterator();
         if (!empty($extract)) $this->setExtract($extract);
-    }
-    /**
-     * Assembles article into template
-     *
-     *
-     * @param array|null $item : override configuration for building "item" node
-     * @return DOMDocument : article rendered as DOMDocument instance into template
-     */
-    public function assembleWXR(?array $item = NULL)
-    {
-        if (empty($this->template))
-            $this->template = $this->buildTemplate();
-        $this->wxr = clone $this->template;
-        $article = $this->addArticle($item);
-        //$this->wxr->appendChild($article);
-        return $this->wxr;
     }
     /**
      * Sets new Extract instance
@@ -176,9 +160,10 @@ class BuildWXR
      * Leaves <item></item> node blank
      * Puts in the form of a SimpleXMLElement instance
      *
-     * @return DOMDocument : $this->template
+     * @param bool $test   : set to TRUE for testing
+     * @return SimpleXMLElement : $this->wxr
      */
-    public function buildTemplate() : DOMDocument
+    public function buildWxr($test = FALSE) : SimpleXMLElement
     {
         $this->writer->openMemory();
         $this->writer->startDocument('1.0', 'UTF-8');
@@ -193,26 +178,26 @@ class BuildWXR
         }
         $this->writer->startElement('channel');
         $this->doAddNode($this->export['channel']);
+        if (!$test) {
+            $this->writer->startElement('item');
+            $this->addArticle();
+            $this->writer->endElement();
+        }
         $this->writer->endElement();    // ends "channel"
         $this->writer->endElement();    // ends "rss"
-        $this->template = new DOMDocument();
-        $this->template->loadXML($this->writer->outputMemory());
-        return $this->template;
+        $this->wxr = new SimpleXMLElement($this->writer->outputMemory());
+        return $this->wxr;
     }
     /**
      * Adds XML nested nodes pertaining to WordPress article
      *
      * @param array|null $item : override configuration for building "item" node
-     * @return string $xml : XML document representing article
      */
-    public function addArticle(?array $item = NULL)
+    public function addArticle(?array $item = NULL) : void
     {
-        $this->writer->openMemory();
-        $this->writer->startDocument('1.0', 'UTF-8');
-        $this->writer->startElement('item');
         $item = $item ?? $this->item;
         foreach ($item as $key => $value) {
-            $key = str_replace(':', '__', $key);
+            //$key = str_replace(':', '__', $key);
             $this->writer->startElement($key);
             if ($key === 'category') {
                 $this->doAddCategory($value);
@@ -233,10 +218,6 @@ class BuildWXR
             }
             $this->writer->endElement();
         }
-        $this->writer->endElement();
-        $xml = $this->writer->outputMemory();
-        $xml = str_replace('__', ':', $xml);
-        return $xml;
     }
     /**
      * Processes "category" node
