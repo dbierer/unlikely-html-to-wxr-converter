@@ -37,4 +37,11 @@ class CleanTest extends TestCase
         $actual = (new Clean())($str, ['bodyOnly' => TRUE]);
         $this->assertEquals($expected, $actual, 'Body contents not returned');
     }
+    public function testStripsOffLFandSpaces()
+    {
+        $str = '<h1>Test</h1>' . "\n" . '<p>TEST</p>  ';
+        $expected = '<h1>Test</h1><p>TEST</p>';
+        $actual = (new Clean())($str);
+        $this->assertEquals($expected, $actual, 'LF and leading/trailing spaces not removed.');
+    }
 }

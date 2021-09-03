@@ -4,6 +4,7 @@ namespace WP_CLI\UnlikelyTest\Import;
 use DateTime;
 use DateTimeZone;
 use Throwable;
+use UnexpectedValueException;
 use XmlWriter;
 use SimpleXMLElement;
 use WP_CLI\Unlikely\Import\{BuildWXR,Extract,BuildWXRInterface};
@@ -19,8 +20,7 @@ class BuildWXRTest extends TestCase
         $this->config = include __DIR__ . '/../../../src/config/config.php';
         $fn  = __DIR__ . '/../../../data/symptoms.html';
         $this->extract = new Extract($fn, $this->config);
-        $this->build   = new BuildWXR($this->config);
-        $this->build->setExtract($this->extract);
+        $this->build   = new BuildWXR($this->config, $this->extract);
         $this->mock_callback = new class () extends DateTime implements BuildWXRInterface {
             public $build = NULL;
             public function setBuildWXRInstance(BuildWXR $build)
@@ -144,19 +144,19 @@ class BuildWXRTest extends TestCase
         $actual = (empty($obj)) ? NULL : get_class($obj);
         $this->assertEquals($expected, $actual, 'Extract instance not found in callbackManager');
     }
-    public function testAddArticleReturnsDOMDocument()
+    public function testAddArticleReturnsXML()
     {
         $article = $this->build->addArticle([]);
-        $expected = 'DOMDocument';
-        $actual   = get_class($article);
-        $this->assertEquals($expected, $actual, 'buildTemplate() does not create SimpleXMLElement instance');
+        $expected = '<?xml version="1.0" encoding="UTF-8"?>';
+        $actual   = substr($article, 0, 38);
+        $this->assertEquals($expected, $actual, 'buildTemplate() does not create XML');
     }
     public function testAddArticleAddsSingleTextNode()
     {
         $article = $this->build->addArticle(['test' => 'TEST']);
-        $expected = 'TEST';
-        $test = $article->getElementsByTagName('test')[0] ?? NULL;
-        $actual = $test->textContent ?? '';
+        $search  = '<test>TEST</test>';
+        $expected = TRUE;
+        $actual   = (bool) strpos($article, $search);
         $this->assertEquals($expected, $actual, 'Single text node not added');
     }
     public function testAddArticleAddsSingleTextCDataNode()
@@ -164,7 +164,7 @@ class BuildWXRTest extends TestCase
         $article = $this->build->addArticle(['test' => ['CDATA' => 'TEST']]);
         $cdata = '<![CDATA[TEST]]>';
         $expected = TRUE;
-        $actual = (bool) strpos($article->saveXML(), $cdata);
+        $actual = (bool) strpos($article, $cdata);
         $this->assertEquals($expected, $actual, 'Single CDATA text node not added');
     }
     public function testDoCallbackUsingFunction()
@@ -242,10 +242,10 @@ class BuildWXRTest extends TestCase
                 ]
         ];
         $article = $this->build->addArticle($item);
-        $expected = 'Chronic Mercury Poisoning: Symptoms &amp; Diseases';
-        $test = $article->getElementsByTagName('title')[0] ?? NULL;
-        $actual = $test->textContent ?? '';
-        $this->assertEquals($expected, $actual, 'addArticles does not process callback correctly');
+        $search = '<title>Chronic Mercury Poisoning: Symptoms &amp;amp; Diseases</title>';
+        $expected = TRUE;
+        $actual = (bool) strpos($article, $search);
+        $this->assertEquals($expected, $actual, 'addArticle() does not process callback correctly');
     }
     public function testAddArticleCDATARunsCallback()
     {
@@ -258,10 +258,18 @@ class BuildWXRTest extends TestCase
             ],
         ];
         $article = $this->build->addArticle($item);
+        $search  = '<![CDATA[Chronic Mercury Poisoning: Symptoms &amp; Diseases]]>';
         $expected = TRUE;
-        $test = $article->saveXML() ?? '';
-        $actual = (bool) strpos($test, '<![CDATA[Chronic Mercury Poisoning: Symptoms &amp; Diseases]]>');
-        $this->assertEquals($expected, $actual, 'addArticles does not process callback producing CDATA correctly');
+        $actual = (bool) strpos($article, $search);
+        $this->assertEquals($expected, $actual, 'addArticle() does not process callback producing CDATA correctly');
+    }
+    public function testAddArticleOnActualDocument()
+    {
+        $article = $this->build->addArticle();
+        $expected = '<category domain="category" nicename="data"><![CDATA[data]]></category></item>';
+        $pos = -1 * strlen($expected);
+        $actual = substr($article, $pos);
+        $this->assertEquals($expected, $actual, 'addArticle() does not work on full document');
     }
     public function testAssembleWXRCreatesTemplate()
     {
@@ -273,12 +281,13 @@ class BuildWXRTest extends TestCase
         $actual = empty($this->build->template);
         $this->assertEquals($expected, $actual, 'Template should not be empty after running buildTemplate()');
     }
+    /*
     public function testAssembleWXRCreatesWxrAsDOMDocument()
     {
-        error_log(__METHOD__);
-        $expected = TRUE;
         $wxr = $this->build->assembleWXR();
-        $actual = ($wxr instanceof DOMDocument);
+        $expected = 'DOMDocument';
+        $actual   = get_class($wxr);
         $this->assertEquals($expected, $actual, 'WXR not created as DOMDocument');
     }
+    */
 }

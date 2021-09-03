@@ -44,10 +44,12 @@ $config = [
         ],
     ],
     'item' => [
-        'title' => ['CDATA' =>
-            ['callback' => [
-                'class' => Extract::class,
-                'method' => 'getTitle']
+        'title' => [
+            'CDATA' =>
+                ['callback' => [
+                    'class' => Extract::class,
+                    'method' => 'getTitle'
+                ]
             ]
         ],
         'link' =>  [
@@ -139,23 +141,32 @@ $config = [
         'wp:post_password' => ['CDATA' => ''],
         'wp:is_sticky' => 0,
         'category' => [
-            // category tag attributes
-            'domain' => 'category',
-            'nicename' => [Extract::class => 'getLastDir'],
+            'attributes' => [
+                // category tag attributes
+                'domain' => 'category',
+                'nicename' => [
+                    'callback' => [
+                        'class' => Extract::class,
+                        'method' => 'getLastDir'
+                    ]
+                ],
+            ],
             // category tag value
-            ['CDATA' => [Extract::class => 'getLastDir']],
-        ],
-        'wp:postmeta' => [
-          ['CDATA' => '_edit_last', ['CDATA' => '1']],
+            'CDATA' => [
+                'callback' => [
+                    'class' => Extract::class,
+                    'method' => 'getLastDir'
+                ]
+            ],
         ],
     ],
     //**********************************************
     // main extraction
     //**********************************************
     Extract::class => [
-        'attrib_list'  => Extract::DEFAULT_ATTR_LIST,   // list of attributes to strip
-        'delim_start'  => Extract::DELIM_START,         // marks beginning of contents to extract
-        'delim_stop'   => Extract::DELIM_STOP,          // marks end of contents to extract
+        'attrib_list'  => Extract::DEFAULT_ATTR_LIST,                               // list of attributes to strip
+        'delim_start'  => '<!--#include virtual="/sidemenu_include.html" -->',     // marks beginning of contents to extract
+        'delim_stop'   => '<!--#include virtual="/footer_include.html" -->',       // marks end of contents to extract
         'title_regex'  => Extract::TITLE_REGEX,         // regex to extract title
         'excerpt_tags' => Extract::EXCERPT_TAGS,        // tags(s) to search for to locate extract
         'transform' => [
@@ -167,13 +178,13 @@ $config = [
                 'callback' => new RemoveBlock(),
                 'params' => ['start' => '<tr height="20">','stop' => '</tr>','items' => ['bkgnd_tandk.gif','trans_spacer50.gif','bkgnd_tanlt.gif']],
             ],
+            'table_to_row_col_div' => [
+                'callback' => new TableToDiv(),
+                'params' => ['td' => 'col', 'th' => 'col bold', 'row' => 'row', 'width' => 12],
+            ],
             'attribs_remove' => [
                 'callback' => new RemoveAttributes(),
                 'params' => ['attributes' => Extract::DEFAULT_ATTR_LIST]
-            ],
-            'table_to_row_col_div' => [
-                'callback' => new TableToDiv(),
-                'params' => ['col' => 'col-md-%d', 'row' => 'row', 'width' => 12],
             ],
         ],
     ],

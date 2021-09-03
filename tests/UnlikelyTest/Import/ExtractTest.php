@@ -3,6 +3,7 @@ namespace WP_CLI\UnlikelyTest\Import;
 
 use DateTime;
 use DateTimeZone;
+use Exception;
 use Throwable;
 use WP_CLI\Unlikely\Import\Extract;
 use PHPUnit\Framework\TestCase;
@@ -23,14 +24,16 @@ class ExtractTest extends TestCase
     }
     public function testConstructHtmlFileNotFound()
     {
+        //$this->expectException(Exception::class);
         $err = [];
         $fn  = 'file_does_not_exist.html';
-        $expected = Extract::ERR_FILE;
+        $expected = 'Exception';
         try {
             $extract = new Extract($fn, $this->config);
             $actual = $extract->getHtml($err);
+            error_log(__METHOD__ . ':' . var_export($err, TRUE));
         } catch (Throwable $t) {
-            $actual = $t->getMessage();
+            $actual = get_class($t);
         }
         $this->assertEquals($expected, $actual, 'Does not handle file not found properly');
     }
@@ -154,5 +157,30 @@ class ExtractTest extends TestCase
         $html = $extract->getHtml($err);
         $actual = strpos($html, 'width=');
         $this->assertEquals($expected, $actual, 'Width attribute not removed');
+    }
+    public function testGetHtmlBlockRemovedProperly()
+    {
+        $err = [];
+        $fn  = __DIR__ . '/../../../data/symptoms.html';
+        $extract = new Extract($fn, $this->config);
+        $expected = FALSE;
+        $html = $extract->getHtml($err);
+        $actual = strpos($html, '<tr height="20">');
+        $this->assertEquals($expected, $actual, 'Block not removed properly');
+    }
+    public function testGetHtmlThrowsExceptionInvalidCallback()
+    {
+        $err = [];
+        $fn  = __DIR__ . '/../../../data/symptoms.html';
+        $this->config[Extract::class]['transform'] = ['test' => ['callback' => 'XYZ', 'params' => []]];
+        $expected = 'Exception';
+        try {
+            $extract = new Extract($fn, $this->config);
+            $actual = $extract->getHtml($err);
+            error_log(__METHOD__ . ':' . var_export($err, TRUE));
+        } catch (Throwable $t) {
+            $actual = get_class($t);
+        }
+        $this->assertEquals($expected, $actual, 'Exception not thrown if transform callback is invalid ');
     }
 }

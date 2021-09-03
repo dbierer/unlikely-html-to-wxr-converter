@@ -43,12 +43,12 @@ class Clean implements TransformInterface
         if (function_exists('tidy_error_count')) {
             $tidy = new \tidy();
             $html = $tidy->repairString($html);
+            $html = trim(str_replace("\n", '', $html));
             $bodyOnly = $params['bodyOnly'] ?? TRUE;
             if ($bodyOnly) {
                 $matches = [];
                 preg_match('!\<body\>(.+?)\<\/body\>!ims', $html, $matches);
                 if (!empty($matches[1])) $html = $matches[1];
-                $html = trim(str_replace("\n", ' ', $html));
             }
         }
         return $html;

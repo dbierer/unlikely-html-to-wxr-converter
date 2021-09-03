@@ -31,6 +31,7 @@ namespace WP_CLI\Unlikely\Import;
 use Exception;
 use BadMethodCallException;
 use InvalidArgumentException;
+use UnexpectedValueException;
 use DateTime;
 use DateTimeZone;
 use XmlWriter;
@@ -44,6 +45,7 @@ class BuildWXR
     public const ERR_CALLBACK_CLASS = 'ERROR: unable to process callback: missing configuration for %s class?';
     public const ERR_CALLBACK_METHOD = 'ERROR: unable to process callback method: missing configuration for %s class?';
     public const ERR_CALLBACK_INVALID = 'ERROR: callback must implement Unlikely\Import\BuildWXRInterface';
+    public const ERR_ITEM_KEY = 'ERROR: problem with "item" configuration.  All values must be arrays. "configuration" treated separately.';
     public $config = [];
     public $export = [];            // import template config
     public $item   = [];            // config to build "item" node
@@ -56,8 +58,9 @@ class BuildWXR
      * Initializes delimiters and creates transform callback array
      *
      * @param array $config : ['export' => ['rss' => [attribs], 'channel' => [WXR nodes]], 'item' => [config for building "item" node]]
+     * @param Extract $extract : new Extract instance
      */
-    public function __construct(array $config)
+    public function __construct(array $config, Extract $extract = NULL)
     {
         // bail out if unable to open $fn
         $this->err = [];
@@ -66,6 +69,23 @@ class BuildWXR
         $this->item    = $config['item']   ?? [];
         $this->writer  = new XmlWriter();
         $this->callbackManager = new ArrayIterator();
+        if (!empty($extract)) $this->setExtract($extract);
+    }
+    /**
+     * Assembles article into template
+     *
+     *
+     * @param array|null $item : override configuration for building "item" node
+     * @return DOMDocument : article rendered as DOMDocument instance into template
+     */
+    public function assembleWXR(?array $item = NULL)
+    {
+        if (empty($this->template))
+            $this->template = $this->buildTemplate();
+        $this->wxr = clone $this->template;
+        $article = $this->addArticle($item);
+        //$this->wxr->appendChild($article);
+        return $this->wxr;
     }
     /**
      * Sets new Extract instance
@@ -141,28 +161,14 @@ class BuildWXR
                     $this->doAddNode($value);
                 }
                 $this->writer->endElement();
-            } else {
+            } elseif (is_string($key)) {
                 $this->writer->startElement($key);
                 $this->writer->text($value);
                 $this->writer->endElement();
+            } else {
+                throw new UnexpectedValueException(static::ERR_NODE_KEY . ':' . var_export($key, TRUE));
             }
         }
-    }
-    /**
-     * Assembles article into template
-     *
-     *
-     * @param array|null $item : override configuration for building "item" node
-     * @return DOMDocument : article rendered as DOMDocument instance into template
-     */
-    public function assembleWXR(?array $item = NULL)
-    {
-        if (empty($this->template))
-            $this->template = $this->buildTemplate();
-        $article = $this->addArticle($item);
-        $this->wxr = clone $this->template;
-        $this->wxr->appendChild($article);
-        return $this->wxr;
     }
     /**
      * Builds import XML template
@@ -170,8 +176,9 @@ class BuildWXR
      * Leaves <item></item> node blank
      * Puts in the form of a SimpleXMLElement instance
      *
+     * @return DOMDocument : $this->template
      */
-    public function buildTemplate() : void
+    public function buildTemplate() : DOMDocument
     {
         $this->writer->openMemory();
         $this->writer->startDocument('1.0', 'UTF-8');
@@ -190,12 +197,13 @@ class BuildWXR
         $this->writer->endElement();    // ends "rss"
         $this->template = new DOMDocument();
         $this->template->loadXML($this->writer->outputMemory());
+        return $this->template;
     }
     /**
      * Adds XML nested nodes pertaining to WordPress article
      *
      * @param array|null $item : override configuration for building "item" node
-     * @return DOMDocument $article : item (article) rendered as DOMDocument instance
+     * @return string $xml : XML document representing article
      */
     public function addArticle(?array $item = NULL)
     {
@@ -204,8 +212,11 @@ class BuildWXR
         $this->writer->startElement('item');
         $item = $item ?? $this->item;
         foreach ($item as $key => $value) {
-            if (is_array($value)) {
-                $this->writer->startElement($key);
+            $key = str_replace(':', '__', $key);
+            $this->writer->startElement($key);
+            if ($key === 'category') {
+                $this->doAddCategory($value);
+            } elseif (is_array($value)) {
                 if (isset($value['CDATA'])) {
                     if (is_array($value['CDATA']) && isset($value['CDATA']['callback'])) {
                         $this->addCdata($this->doCallback($value['CDATA']['callback']));
@@ -215,20 +226,38 @@ class BuildWXR
                 } elseif (isset($value['callback'])) {
                     $this->writer->text($this->doCallback($value['callback']));
                 } else {
-                    // recurse to next level
-                    $this->addNode($value);
+                    $this->writer->text(current($value));
                 }
-                $this->writer->endElement();
             } else {
-                $this->writer->startElement($key);
                 $this->writer->text($value);
-                $this->writer->endElement();
             }
+            $this->writer->endElement();
         }
         $this->writer->endElement();
-        $article = new DOMDocument();
-        $article->loadXML($this->writer->outputMemory());
-        return $article;
+        $xml = $this->writer->outputMemory();
+        $xml = str_replace('__', ':', $xml);
+        return $xml;
+    }
+    /**
+     * Processes "category" node
+     *
+     * @param array $node : node representing category
+     */
+    public function doAddCategory(array $node) : void
+    {
+        $attributes = $node['attributes'] ?? [];
+        foreach ($attributes as $attrib => $value) {
+            $this->writer->startAttribute($attrib);
+            if (is_string($value)) {
+                $this->writer->text($value);
+            } elseif (is_array($value)) {
+                if (isset($value['callback'])) {
+                    $this->writer->text($this->doCallback($value['callback']));
+                }
+            }
+            $this->writer->endAttribute();
+        }
+        $this->addCdata($this->doCallback($node['CDATA']['callback']));
     }
     /**
      * Runs callbacks

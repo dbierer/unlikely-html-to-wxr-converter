@@ -30,42 +30,57 @@ namespace WP_CLI\Unlikely\Import\Transform;
 use InvalidArgumentException;
 class TableToDiv implements TransformInterface
 {
-    public $col   = NULL;  // sprintf() string to format <div class="col-xxx">
-    public $row   = 'row'; // row class (default == "row")
-    public $width = 12;    // represents the max value for col class (default 12)
-    public const ERR_PARAMS = 'ERROR: parameter array must contain the keys "row, "col" and "width"';
+    public $tr = '';  // row class (default == "row")
+    public $td = '';  // column class (default == "col")
+    public $th = '';  // header column class (default == "col bold")
+    public const DEFAULT_TR = 'row';
+    public const DEFAULT_TD = 'col';
+    public const DEFAULT_TH = 'col bold';
     /**
-     * Converts HTML <table><tr><td>|<th> to <div class="row"><div class="col-xxx">
+     * Converts HTML <table><tr><td>|<th> to <div class="row"><div class="col">
      *
      * @param string $html : HTML string to be cleaned
-     * @param array $params : ['col'   => : sprintf() pattern for column <div> tags
-     *                         'row'   => : row class
-     *                         'width' => : represents the max value for col class (default 12)
+     * @param array $params : ['td'   => : td class (default: "col")
+     *                         'th'   => : td class (default: "col bold")
+     *                         'tr'   => : row class (default: "row")]
      * @return string $html : HTML with <table><tr><td>|<th> conversions done
      */
     public function __invoke(string $html, array $params = []) : string
     {
         $this->init($params);
-        $html = $this->convertRow($html);
-        $html = $this->convertCol($html);
-        return $html;
+        return $this->convert($html);
     }
     /**
      * Initializes properties
      *
-     * @param array $params : ['col'   => : sprintf() pattern for column <div> tags
-     *                         'row'   => : row class
-     *                         'width' => : represents the max value for col class (default 12)
+     * @param array $params : ['tr'   => : row class
+     *                         'td'   => : column class
+     *                         'th' =>   : header column class
      * @return void
-     * @throws InvalidArgumentException
+     * @thtrs InvalidArgumentException
      */
     public function init(array $params) : void
     {
-        $this->col   = $params['col']   ?? '';
-        $this->row   = $params['row']   ?? '';
-        $this->width = $params['width'] ?? [];
-        if (empty($this->col) || empty($this->row) || empty($this->width))
-            throw new InvalidArgumentException(self::ERR_PARAMS);
+        $this->td = $params['td'] ?? static::DEFAULT_TD;
+        $this->tr = $params['tr'] ?? static::DEFAULT_TR;
+        $this->th = $params['th'] ?? static::DEFAULT_TH;
+    }
+    /**
+     * Performs conversion:
+     * -- removes table tags
+     * -- converts <tr> into <div class="$this->tr">
+     * -- converts <td> into <div class="$this->td">
+     * -- converts <th> into <div class="$this->th">
+     *
+     * @param string $html : HTML string to be cleaned
+     * @return string $html : HTML with <tr></tr> conversions done
+     */
+    public function convert(string $html) : string
+    {
+        $html = $this->removeTableTags($html);
+        $html = $this->convertRow($html);
+        $html = $this->convertCol($html);
+        return $html;
     }
     /**
      * Removes "<table>" and "</table>"
@@ -89,7 +104,7 @@ class TableToDiv implements TransformInterface
     public function convertRow(string $html) : string
     {
         $search = '!<tr.*?>!i';
-        $html = preg_replace($search, '<div class="' . $this->row . '">', $html);
+        $html = preg_replace($search, '<div class="' . $this->tr . '">', $html);
         $html = str_ireplace('</tr>', '</div>', $html);
         return $html;
     }
@@ -102,20 +117,12 @@ class TableToDiv implements TransformInterface
      */
     public function convertCol(string $html) : string
     {
-        // search for <td>|<th> with "width=" attribute
-        $patt = '<td.*?width="(.+?)".*?>!i';
-        $matches = [];
-        preg_match_all($patt, $html, $matches);
-        return $matches;
-        /*
-            // if "%" type width: determine width % with col pattern where 100% === col-XX-{$this->width}
-            // if "px" or "pt" or just a number type width: determine width % with col pattern where NNN(px|pt)? === col-XX-{$this->width}
-        // if no "width" then count the # <td>|<th> elements between <tr></tr>
-            // define col-XX-NN size as even division of {$this->width}
-        // replace ending tags
-        $html = preg_replace($search, '<div class="' . $this->row . '">', $html);
-        $html = str_ireplace(['</td>','</th>'], ['</div>','</b></div>'], $html);
+        $search = '!<td.*?>!i';
+        $html = preg_replace($search, '<div class="' . $this->td . '">', $html);
+        $html = str_ireplace('</td>', '</div>', $html);
+        $search = '!<th.*?>!i';
+        $html = preg_replace($search, '<div class="' . $this->th . '">', $html);
+        $html = str_ireplace('</th>', '</div>', $html);
         return $html;
-        */
     }
 }

@@ -34,13 +34,14 @@ use SplFileObject;
 
 class Extract implements BuildWXRInterface
 {
-    public const DELIM_START  = '<!--#include virtual ="/sidemenu_include.html" -->';
-    public const DELIM_STOP   = '<!--#include virtual ="/footer_include.html" -->';
+    public const DELIM_START  = '<body>';
+    public const DELIM_STOP   = '</body>';
     public const TITLE_REGEX  = '!\<title\>(.+?)\<\/title\>!';
     public const EXCERPT_TAGS = ['h2' => 'p', 'p' => 'p'];
     public const ERR_DELIM    = 'ERROR: beginning or end delimiter not found';
     public const ERR_FILE     = 'ERROR: HTML file not found';
     public const ERR_READ     = 'ERROR: unable to read HTML file';
+    public const ERR_CALLBACK = 'ERROR: transform callback is not callable';
     public const DEFAULT_TZ   = 'PST';
     public const DEFAULT_TITLE = 'Title Unknown';
     public const DEFAULT_EXCERPT = '';
@@ -54,6 +55,7 @@ class Extract implements BuildWXRInterface
      *
      * @param string $fn : filename of HTML document
      * @param array $config : ['delim_start' => XXX, 'delim_stop' => YYY]
+     * @throws Exception : if $fn has no contents or doesn't exist
      */
     public function __construct(string $fn, array $config)
     {
@@ -61,7 +63,6 @@ class Extract implements BuildWXRInterface
         $this->err = [];
         $this->contents = $this->getContents($fn, $this->err);
         if (empty($this->contents)) {
-            error_log(__METHOD__ . ':' . implode(PHP_EOL, $this->err));
             throw new Exception(static::ERR_FILE);
         }
         $this->config    = $config[__CLASS__] ?? [];
@@ -223,6 +224,7 @@ class Extract implements BuildWXRInterface
      *
      * @param ?array $err : error messages (passed by reference)
      * @return string $html : clean HTML; returns '' if unable to process content
+     * @throws Exception :; if "transform" => "callback" value is not callable
      */
     public function getHtml(?array &$err = [])
     {
@@ -242,11 +244,14 @@ class Extract implements BuildWXRInterface
             if (!empty($middle)) {
                 $html  = $middle;
                 // perform tranformations
-                $transform = $config['extract']['transform'] ?? [];
+                $transform = $this->config['transform'] ?? [];
                 foreach ($transform as $item) {
-                    $callback = $item['callback'] ?? function ($str) { return $str; };
-                    $params   = $item['params']   ?? [];
-                    $html = $callback($html, $params);
+                    if (empty($item['callback'])) continue;
+                    $callback = $item['callback'];
+                    if (!is_callable($callback))
+                        throw new Exception(static::ERR_CALLBACK);
+                    $params = $item['params'] ?? [];
+                    $html   = $callback($html, $params);
                 }
             }
         }

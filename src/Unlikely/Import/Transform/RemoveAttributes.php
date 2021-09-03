@@ -37,12 +37,15 @@ class RemoveAttributes implements TransformInterface
      */
     public function __invoke(string $html, array $params = []) : string
     {
-        $blank = '! %s=".*?"!';
+        $blank = '!\b%s=".*?"!';
         $list  = $params['attributes'] ?? [];
         foreach ($list as $attrib) {
             $patt = sprintf($blank, $attrib);
-            $html = preg_replace($patt, '', $html);
+            $html = preg_replace($patt, ' ', $html);
+            $html = str_replace('  ',' ',$html);
         }
+        $html = str_replace('  ',' ',$html);
+        $html = str_replace(' >','>',$html);
         return $html;
     }
 }
