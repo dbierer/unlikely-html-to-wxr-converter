@@ -33,9 +33,11 @@ use WP_CLI_Command;
 
 class HtmlToWxrCommand extends WP_CLI_Command
 {
-    public const ERROR_POS_ARGS = 'ERROR: path to config file and/or destination directory to write WXR files missing or invalid';
-    public const ERROR_SINGLE   = 'ERROR: single file not found';
-    public const ERROR_SRC      = 'ERROR: source directory path not found';
+    public const ERROR_POS_ARGS = 'path to config file and/or destination directory to write WXR files missing or invalid';
+    public const ERROR_SINGLE   = 'single file not found';
+    public const ERROR_SRC      = 'source directory path not found';
+    public const ERROR_CONVERT  = 'conversion process error';
+    public const SUCCESS_FILE   = 'Conversion successful! Out file name: %s';
     public const SYNOPSIS = [
         'shortdesc' => 'Converts one or more HTML files to WordPress WXR import format',
         'synopsis' => [
@@ -54,11 +56,12 @@ class HtmlToWxrCommand extends WP_CLI_Command
                 'repeating'   => false,
             ],
             [
-                'type'        => 'positional',
-                'name'        => 'next_id',
+                'type'        => 'assoc',
+                'name'        => 'next-id',
                 'description' => 'Next post ID number',
-                'optional'    => false,
+                'optional'    => true,
                 'repeating'   => false,
+                'default'     => '1',
             ],
             [
                 'type'        => 'assoc',
@@ -71,9 +74,9 @@ class HtmlToWxrCommand extends WP_CLI_Command
             [
                 'type'        => 'assoc',
                 'name'        => 'single',
-                'description' => 'Single file to convert. If full path to file is not provided, prepends the value of "src" to "single"',
+                'description' => 'Single file to convert. If full path to file is not provided, prepends the value of "src" to "single".  See also: "html-only"',
                 'optional'    => true,
-                'default'     => 'none',
+                'default'     => 'NULL',
                 //'options'     => [ 'success', 'error' ],
             ],
             [
@@ -82,6 +85,14 @@ class HtmlToWxrCommand extends WP_CLI_Command
                 'description' => 'Extension(s) other than "html" to convert.  If multiple extension, separate extensions with comma(s)',
                 'optional'    => true,
                 'default'     => 'html',
+                //'options'     => [ 'success', 'error' ],
+            ],
+            [
+                'type'        => 'assoc',
+                'name'        => 'html-only',
+                'description' => 'If set to "1", this flag causes no XML to be returned: only the cleaned and sanitized extracted HTML; only works with the "single" option',
+                'optional'    => true,
+                'default'     => 'FALSE',
                 //'options'     => [ 'success', 'error' ],
             ],
         ],
@@ -102,11 +113,29 @@ class HtmlToWxrCommand extends WP_CLI_Command
         // if single, convert single file
         if (!empty($container['single'])) {
             $extract = new Extract($container['single'], $container['config']);
-            $this->convertSingle($extract, $container);
+            // if html-only, just return clean HTML
+            if (!empty($container['html-only'])) {
+                $err = [];
+                $html = $extract->getHtml($err);
+                if (!empty($html)) {
+                    WP_CLI::line($html);
+                } else {
+                    WP_CLI::line(self::ERROR_CONVERT);
+                    WP_CLI::error_multi_line($err);
+                }
+            } else {
+                $out_file = $this->convertSingle($extract, $container);
+                if (empty($out_file)) {
+                    WP_CLI::line(self::ERROR_CONVERT);
+                    WP_CLI::error_multi_line($extract->err);
+                } else {
+                    WP_CLI::line(sprintf(self::SUCCESS_FILE, $out_file));
+                }
+            }
         } else {
             // otherwise build a list of files
             $iter = $this->getDirIterator($container);
-            $next_id = $container['next_id'];
+            $next_id = $container['next-id'];
             // loop through list
             $iter->rewind();
             while ($iter->valid()) {
@@ -116,7 +145,13 @@ class HtmlToWxrCommand extends WP_CLI_Command
                 } else {
                     $extract->resetFile($name, $next_id++);
                 }
-                $this->convertSingle($extract, $container);
+                $out_file = $this->convertSingle($extract, $container);
+                if (empty($out_file)) {
+                    WP_CLI::line(self::ERROR_CONVERT);
+                    WP_CLI::error_multi_line($extract->err);
+                } else {
+                    WP_CLI::line(sprintf(self::SUCCESS_FILE, $out_file));
+                }
                 $iter->next();
             }
         }
@@ -182,19 +217,21 @@ class HtmlToWxrCommand extends WP_CLI_Command
         $container = new ArgsContainer();
         $config = WP_CLI::line($args[0]) ?? '';
         $dest_dir = WP_CLI::line($args[1]) ?? '';
-        $next_id  = WP_CLI::line($args[2]) ?? 0;
         if (empty($config) || empty($dest_dir) || !file_exists($config) || !file_exists($dest_dir)) {
             $container->addErrorMessage(self::ERROR_POS_ARGS);
             return $container;
         } else {
             $container->offsetSet('config', require $config);
             $container->offsetSet('dest', $dest_dir);
-            $container->offsetSet('next_id', $next_id);
         }
         // grab optional params
+        $next_id= WP_CLI::line($assoc_args['next-id']) ?? 1;
         $src    = WP_CLI::line($assoc_args['src']) ?? \WP_CLI\Utils\get_home_dir();
         $single = WP_CLI::line($assoc_args['single']) ?? '';
         $ext    = WP_CLI::line($assoc_args['ext']) ?? 'html';
+        $only   = (!empty(WP_CLI::line($assoc_args['html-only']))) ? TRUE : FALSE;
+        // sanitize $next_id param
+        $container->offsetSet('next-id', (int) $next_id);
         // sanitize $src param
         if (!file_exists($src)) {
             error_log(__METHOD__ . ':' . __LINE__ . ':' . self::ERROR_SRC . ':' . $src);
@@ -209,6 +246,7 @@ class HtmlToWxrCommand extends WP_CLI_Command
                 $fn = $src . DIRECTORY_SEPARATOR . $single;
                 $double = DIRECTORY_SEPARATOR . DIRECTORY_SEPARATOR;
                 $fn = str_replace($double, DIRECTORY_SEPARATOR, $fn);
+                $fn = WP_CLI\Utils\normalize_path($fn);
                 if (!file_exists($fn)) {
                     error_log(__METHOD__ . ':' . __LINE__ . ':' . self::ERROR_SINGLE . ':' . $fn);
                     $container->addErrorMessage(self::ERROR_SINGLE);
@@ -225,6 +263,8 @@ class HtmlToWxrCommand extends WP_CLI_Command
             $ext = [$ext];
         }
         $container->offsetSet('ext', $ext);
+        // html-only flag
+        $container->offsetSet('html-only', $only);
         return $container;
     }
 }
