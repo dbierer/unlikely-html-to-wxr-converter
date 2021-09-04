@@ -155,15 +155,13 @@ class BuildWXR
         }
     }
     /**
-     * Builds import XML template
+     * Builds import XML
      *
-     * Leaves <item></item> node blank
-     * Puts in the form of a SimpleXMLElement instance
-     *
+     * @param string $fn   : if present, writes XML to this filename
      * @param bool $test   : set to TRUE for testing
      * @return SimpleXMLElement : $this->wxr
      */
-    public function buildWxr($test = FALSE) : SimpleXMLElement
+    public function buildWxr(string $fn = '', bool $test = FALSE) : SimpleXMLElement
     {
         $this->writer->openMemory();
         $this->writer->startDocument('1.0', 'UTF-8');
@@ -186,6 +184,7 @@ class BuildWXR
         $this->writer->endElement();    // ends "channel"
         $this->writer->endElement();    // ends "rss"
         $this->wxr = new SimpleXMLElement($this->writer->outputMemory());
+        if (!empty($fn)) $this->wxr->asXML($fn);
         return $this->wxr;
     }
     /**

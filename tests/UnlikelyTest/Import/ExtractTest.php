@@ -14,13 +14,13 @@ class ExtractTest extends TestCase
     {
         $this->config = include __DIR__ . '/../../../src/config/config.php';
     }
-    public function testConstructExtractConfigKeyFound()
+    public function testConstructConfigurationFileLoaded()
     {
-        $fn  = __DIR__ . '/../../../data/symptoms_missing_delim.html';
+        $fn  = __DIR__ . '/../../../data/symptoms.html';
         $extract = new Extract($fn, $this->config);
         $expected = FALSE;
         $actual   = (empty($extract->config));
-        $this->assertEquals($expected, $actual, 'Config key "extract" not found');
+        $this->assertEquals($expected, $actual, 'Config file not loaded');
     }
     public function testConstructHtmlFileNotFound()
     {
@@ -36,6 +36,16 @@ class ExtractTest extends TestCase
             $actual = get_class($t);
         }
         $this->assertEquals($expected, $actual, 'Does not handle file not found properly');
+    }
+    public function testResetFile()
+    {
+        $fn1  = __DIR__ . '/../../../data/symptoms.html';
+        $extract = new Extract($fn1, $this->config);
+        $size1 = strlen($extract->contents);
+        $fn2  = __DIR__ . '/../../../data/find_health_pros.html';
+        $extract->resetFile($fn2);
+        $size2 = strlen($extract->contents);
+        $this->assertNotEquals($size1, $size2, 'resetFile() not working');
     }
     public function testGetContents()
     {

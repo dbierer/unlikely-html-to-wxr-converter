@@ -50,27 +50,54 @@ class Extract implements BuildWXRInterface
     public $config      = [];
     public $contents    = '';
     public $file_obj    = NULL;
+    public $next_id     = 1;
     /**
      * Initializes delimiters and creates transform callback array
      *
-     * @param string $fn : filename of HTML document
+     * @param string $fn    : filename of HTML document
      * @param array $config : ['delim_start' => XXX, 'delim_stop' => YYY]
      * @throws Exception : if $fn has no contents or doesn't exist
      */
     public function __construct(string $fn, array $config)
     {
-        // bail out if unable to open $fn
-        $this->err = [];
-        $this->contents = $this->getContents($fn, $this->err);
-        if (empty($this->contents)) {
-            throw new Exception(static::ERR_FILE);
-        }
         $this->config    = $config[__CLASS__] ?? [];
-        $this->file_obj  = new SplFileObject($fn, 'r');
+        $this->resetFile($fn);
     }
+    /**
+     * Needed to maintain consistency with BuildWXRInterface
+     */
     public function setBuildWXRInstance(BuildWXR $build)
     {
         /* do nothing */
+    }
+    /**
+     * Resets filename
+     *
+     * @param string $fn : filename of HTML document
+     * @param int $next_id
+     * @return void
+     * @throws Exception if file doesn't exist or is empty
+     */
+    public function resetFile(string $fn, int $next_id = 1)
+    {
+        $this->err = [];
+        $this->contents = $this->getContents($fn, $this->err);
+        // bail out if unable to open $fn or no contents
+        if (empty($this->contents)) {
+            throw new Exception(static::ERR_FILE);
+        }
+        $this->file_obj  = new SplFileObject($fn, 'r');
+        $this->next_id   = $next_id;
+    }
+    /**
+     * Returns the next post ID number
+     * Increments $this->next_id
+     *
+     * @return int $id
+     */
+    public function getNextId() : int
+    {
+        return $this->next_id++;
     }
     /**
      * Grabs contents of the file

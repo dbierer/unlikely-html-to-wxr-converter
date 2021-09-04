@@ -282,21 +282,21 @@ class BuildWXRTest extends TestCase
     }
     public function testbuildWxrReturnsSimpleXMLElement()
     {
-        $wxr = $this->build->buildWxr();
+        $wxr = $this->build->buildWxr('', TRUE);
         $expected = 'SimpleXMLElement';
         $actual   = get_class($wxr);
         $this->assertEquals($expected, $actual, 'buildWxr() does not create SimpleXMLElement instance');
     }
     public function testBuildWxrAddsRssNode()
     {
-        $wxr = $this->build->buildWxr(TRUE);
+        $wxr = $this->build->buildWxr('', TRUE);
         $expected = TRUE;
         $actual   = strpos($wxr->asXML(), '</rss>');
         $this->assertEquals($expected, $actual, 'buildWxr() does not create RSS node');
     }
     public function testBuildWxrAddsChannelNode()
     {
-        $wxr = $this->build->buildWxr(TRUE);
+        $wxr = $this->build->buildWxr('', TRUE);
         $expected = TRUE;
         $actual   = strpos($wxr->asXML(), '</channel>');
         $this->assertEquals($expected, $actual, 'buildWxr() does not create "channel" node');
@@ -307,5 +307,14 @@ class BuildWXRTest extends TestCase
         $expected = TRUE;
         $actual   = strpos($wxr->asXML(), '</item>');
         $this->assertEquals($expected, $actual, 'buildWxr() does not create "item" node');
+    }
+    public function testBuildWxrWritesXMLFile()
+    {
+        $fn = '/tmp/test.xml';
+        if (file_exists($fn)) unlink($fn);
+        $wxr = $this->build->buildWxr($fn);
+        $expected = TRUE;
+        $actual   = file_exists($fn);
+        $this->assertEquals($expected, $actual, 'buildWxr() did not write XML file');
     }
 }

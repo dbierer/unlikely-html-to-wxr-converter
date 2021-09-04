@@ -24,6 +24,10 @@ namespace WP_CLI\Unlikely;
  *
  */
 
+use ArrayObject;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
+use FilterIterator;
 use WP_CLI;
 use WP_CLI_Command;
 
@@ -46,6 +50,13 @@ class HtmlToWxrCommand extends WP_CLI_Command
                 'type'        => 'positional',
                 'name'        => 'dest',
                 'description' => 'Directory where WXR files will be stored for later import',
+                'optional'    => false,
+                'repeating'   => false,
+            ],
+            [
+                'type'        => 'positional',
+                'name'        => 'next_id',
+                'description' => 'Next post ID number',
                 'optional'    => false,
                 'repeating'   => false,
             ],
@@ -77,27 +88,84 @@ class HtmlToWxrCommand extends WP_CLI_Command
         'when' => 'after_wp_load',
         'longdesc' =>   '## EXAMPLES' . "\n\n" . 'wp html-to-wxr /config/config.php /tmp  --src=/httpdocs --ext=htm,html,phtml',
     ];
-    public $arg_container;
+    public $container;
     /**
      * @param array $args       Indexed array of positional arguments.
      * @param array $assoc_args Associative array of associative arguments.
      */
     public function __invoke($args, $assoc_args)
     {
-        $args_container = $this->sanitizeParams($args, $assoc_args);
-        if ($args_container->status === ArgsContainer::STATUS_ERR) {
+        $container = $this->sanitizeParams($args, $assoc_args);
+        if ($container->status === ArgsContainer::STATUS_ERR) {
             WP_CLI::error_multi_line($obj->getErrorMessages(), TRUE);
         }
-        // read config
         // if single, convert single file
-            // create Extract instance
-            // run assembleWXR()
-            // write XML to file with same name as HTMML
-        // otherwise build a list of files
-        // loop through list
-            // create Extract instance
-            // run assembleWXR()
-            // write XML to file with same name as HTMML
+        if (!empty($container['single'])) {
+            $extract = new Extract($container['single'], $container['config']);
+            $this->convertSingle($extract, $container);
+        } else {
+            // otherwise build a list of files
+            $iter = $this->getDirIterator($container);
+            $next_id = $container['next_id'];
+            // loop through list
+            $iter->rewind();
+            while ($iter->valid()) {
+                $name = $iter->key();
+                if (empty($extract)) {
+                    $extract = new Extract($name, $container['config']);
+                } else {
+                    $extract->resetFile($name, $next_id++);
+                }
+                $this->convertSingle($extract, $container);
+                $iter->next();
+            }
+        }
+    }
+    /**
+     * Converts a single file
+     *
+     * @param Extract $extract
+     * @param ArrayObject $container
+     * @return string $xml_fn : full path to XML file | NULL if none written
+     */
+    public function convertSingle(Extract $extract, ArrayObject $container)
+    {
+        $result  = NULL;
+        $build   = new BuildWXR($container['config'], $extract);
+        // build target path and FN
+        $fn = $extract->file_obj->getBasename($extract->file_obj->getExtension());
+        $dest = $container['dest'] . DIRECTORY_SEPARATOR . $fn . '.xml';
+        $double = DIRECTORY_SEPARATOR . DIRECTORY_SEPARATOR;
+        $dest = str_replace($double, DIRECTORY_SEPARATOR, $dest);
+        if ($build->buildWxr($dest)) $result = $dest;
+        return $result;
+    }
+    /**
+     * Returns recursive directory iteration
+     *
+     * @param ArrayObject $container
+     * @return iterable $dirIterator : filtered recursive directory iterator
+     */
+    public function getDirIterator(ArrayObject $container) : iterable
+    {
+        $src = $container['src'];   // path to start recursion
+        $ext = $container['ext'];   // array of extensions to include
+        $iter = new RecursiveDirectoryIterator($src);
+        $iterPlus = new RecursiveIteratorIterator($iter);
+        $filtIter = new class ($iterPlus, $ext) extends FilterIterator {
+            public $ext = [];
+            public function __construct($iter, $ext)
+            {
+                parent::__construct($iter);
+                $this->ext = $ext;
+            }
+            public function accept()
+            {
+                $info = pathinfo($this->key());
+                return (in_array($info['extension'], $this->ext));
+            }
+        };
+        return $filtIter;
     }
     /**
      * Sanitizes incoming args
@@ -108,18 +176,20 @@ class HtmlToWxrCommand extends WP_CLI_Command
      * @param array $assoc : names params
      * @return ArrayObject $arg_container | FALSE
      */
-    protected function sanitizeParams(array $args, array $assoc)
+    public function sanitizeParams(array $args, array $assoc)
     {
         // santize $config param
-        $args_container = new ArgsContainer();
+        $container = new ArgsContainer();
         $config = WP_CLI::line($args[0]) ?? '';
         $dest_dir = WP_CLI::line($args[1]) ?? '';
+        $next_id  = WP_CLI::line($args[2]) ?? 0;
         if (empty($config) || empty($dest_dir) || !file_exists($config) || !file_exists($dest_dir)) {
-            $args_container->addErrorMessage(self::ERROR_POS_ARGS);
-            return $args_container;
+            $container->addErrorMessage(self::ERROR_POS_ARGS);
+            return $container;
         } else {
-            $args_container->offsetSet('config', $config);
-            $args_container->offsetSet('dest', $dest_dir);
+            $container->offsetSet('config', require $config);
+            $container->offsetSet('dest', $dest_dir);
+            $container->offsetSet('next_id', $next_id);
         }
         // grab optional params
         $src    = WP_CLI::line($assoc_args['src']) ?? \WP_CLI\Utils\get_home_dir();
@@ -128,10 +198,10 @@ class HtmlToWxrCommand extends WP_CLI_Command
         // sanitize $src param
         if (!file_exists($src)) {
             error_log(__METHOD__ . ':' . __LINE__ . ':' . self::ERROR_SRC . ':' . $src);
-            $args_container->addErrorMessage(self::ERROR_SRC);
-            return $args_container;
+            $container->addErrorMessage(self::ERROR_SRC);
+            return $container;
         } else {
-            $args_container->offsetSet('src', $src);
+            $container->offsetSet('src', $src);
         }
         // sanitize $single param
         if (!empty($single)) {
@@ -141,10 +211,10 @@ class HtmlToWxrCommand extends WP_CLI_Command
                 $fn = str_replace($double, DIRECTORY_SEPARATOR, $fn);
                 if (!file_exists($fn)) {
                     error_log(__METHOD__ . ':' . __LINE__ . ':' . self::ERROR_SINGLE . ':' . $fn);
-                    $args_container->addErrorMessage(self::ERROR_SINGLE);
-                    return $args_container;
+                    $container->addErrorMessage(self::ERROR_SINGLE);
+                    return $container;
                 } else {
-                    $args_container->offsetSet('single', $single);
+                    $container->offsetSet('single', $single);
                 }
             }
         }
@@ -154,7 +224,7 @@ class HtmlToWxrCommand extends WP_CLI_Command
         } else {
             $ext = [$ext];
         }
-        $args_container->offsetSet('ext', $ext);
-        return $args_container;
+        $container->offsetSet('ext', $ext);
+        return $container;
     }
 }

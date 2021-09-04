@@ -58,9 +58,14 @@ To import, proceed as follows:
 wp import PATH
 ```
 
+## WXR Format
+Here's an article that explains WordPress WXR format:
+[https://devtidbits.com/2011/03/16/the-wordpress-extended-rss-wxr-exportimport-xml-document-format-decoded-and-explained/](https://devtidbits.com/2011/03/16/the-wordpress-extended-rss-wxr-exportimport-xml-document-format-decoded-and-explained/)
+
 ## Installing
 
 Installing this package requires WP-CLI v2.5 or greater. Update to the latest stable release with `wp cli update`.
+You also need to install the `wordpress-importer` plugin or equivalent (needs to accept WXR files).
 
 Once you've done so, you can install the latest stable version of this package with:
 

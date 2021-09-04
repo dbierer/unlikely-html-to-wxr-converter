@@ -24,12 +24,12 @@ $config = [
             ],
         ],
         'channel' => [
+            'wp:wxr_version' => '1.2',
             'title' => 'website title',
             'link' => 'https://website.com',
             'description' => 'Website description',
             'pubDate' => date(DATE_RSS),
             'language' => 'en-US',
-            'wp:wxr_version' => '1.2',
             'wp:base_site_url' => 'https://website.com',
             'wp:base_blog_url' => 'https://blog.website.com',
             'wp:author' => [
@@ -89,7 +89,12 @@ $config = [
                 ]
             ]
         ],
-        //'wp:post_id' => 'CALLBACK',
+        'wp:post_id' => [
+            'callback' => [
+                'class' => Extract::class,
+                'method' => 'getNextId'
+            ]
+        ],
         'wp:post_date' => [
             'CDATA' => [
                 'callback' => [
@@ -169,6 +174,7 @@ $config = [
         'delim_stop'   => '<!--#include virtual="/footer_include.html" -->',       // marks end of contents to extract
         'title_regex'  => Extract::TITLE_REGEX,         // regex to extract title
         'excerpt_tags' => Extract::EXCERPT_TAGS,        // tags(s) to search for to locate extract
+        'start_id'     => 101,                          // starting post ID number
         'transform' => [
             'clean' => [
                 'callback' => new Clean(),
